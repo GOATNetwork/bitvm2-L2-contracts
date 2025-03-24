@@ -68,39 +68,27 @@ contract GatewayUpgradeable {
         relayer = _relayer;
     }
 
-    modifier onlyOperator1(uint256 withdrawIndex) {
-        uint256 peginIndex = withdrawDataMap[withdrawIndex].peginIndex;
-        uint256 operatorIndex = withdrawDataMap[withdrawIndex].operatorIndex;
-        require(
-            operatorDataMap[peginIndex][operatorIndex].operatorAddress ==
-                msg.sender,
-            "not operator!"
-        );
-        _;
-    }
-
-    modifier onlyOperator2(uint256 peginIndex, uint256 operatorIndex) {
-        require(
-            operatorDataMap[peginIndex][operatorIndex].operatorAddress ==
-                msg.sender,
-            "not operator!"
-        );
-        _;
-    }
-
     modifier onlyRelayer() {
         require(msg.sender == relayer, "not relayer!");
         _;
     }
 
-    modifier onlyRelayerOrOperator(uint256 withdrawIndex) {
-        uint256 peginIndex = withdrawDataMap[withdrawIndex].peginIndex;
-        uint256 operatorIndex = withdrawDataMap[withdrawIndex].operatorIndex;
-        // address(0) can not be msg.sender
+    modifier onlyOperator(uint256 peginIndex, uint256 operatorIndex) {
         require(
             operatorDataMap[peginIndex][operatorIndex].operatorAddress ==
-                msg.sender ||
-                msg.sender == relayer,
+                msg.sender,
+            "not operator!"
+        );
+        _;
+    }
+
+    modifier onlyRelayerOrOperator(uint256 withdrawIndex) {
+        require(
+            msg.sender == relayer ||
+                operatorDataMap[withdrawDataMap[withdrawIndex].peginIndex][
+                    withdrawDataMap[withdrawIndex].operatorIndex
+                ].operatorAddress ==
+                msg.sender,
             "msg sender not relayer or operator!"
         );
         _;
@@ -171,7 +159,7 @@ contract GatewayUpgradeable {
         uint256 operatorIndex
     )
         external
-        onlyOperator2(peginIndex, operatorIndex)
+        onlyOperator(peginIndex, operatorIndex)
         returns (uint256 withdrawIndex)
     {
         PeginData storage peginData = peginDataMap[peginIndex];
@@ -205,7 +193,7 @@ contract GatewayUpgradeable {
 
     function cancelWithdraw(
         uint256 withdrawIndex
-    ) external onlyOperator1(withdrawIndex) {
+    ) external onlyRelayerOrOperator(withdrawIndex) {
         WithdrawData storage withdrawData = withdrawDataMap[withdrawIndex];
         PeginData storage peginData = peginDataMap[withdrawData.peginIndex];
         require(
