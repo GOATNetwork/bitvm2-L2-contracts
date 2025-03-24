@@ -58,7 +58,7 @@ contract GatewayUpgradeable {
     uint256 public globalWithdrawIndex;
     mapping(bytes32 => bool) public peginTxUsed;
     mapping(uint256 => mapping(uint256 => bool)) public operatorWithdrawn;
-    mapping(uint256 => PeginData) public peginDataMap;
+    mapping(uint256 => PeginData) public peginDataMap; // start from index 1
     mapping(uint256 => mapping(uint256 => OperatorData)) public operatorDataMap;
     mapping(uint256 => WithdrawData) public withdrawDataMap;
 
@@ -123,7 +123,7 @@ contract GatewayUpgradeable {
         });
 
         // mint / send pegBTC to user
-        pegBTC.transferFrom(address(this), depositorAddress, peginAmountSats);
+        pegBTC.transfer(depositorAddress, peginAmountSats);
 
         return globalPeginIndex;
     }
@@ -201,7 +201,7 @@ contract GatewayUpgradeable {
             "invalid withdraw index: not at init stage"
         );
         withdrawData.status = WithdrawStatus.Canceled;
-        pegBTC.transferFrom(address(this), msg.sender, withdrawData.lockAmount);
+        pegBTC.transfer(msg.sender, withdrawData.lockAmount);
         peginData.status = PeginStatus.Withdrawbale;
     }
 
