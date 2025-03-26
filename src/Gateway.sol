@@ -93,7 +93,7 @@ contract GatewayUpgradeable {
                     withdrawDataMap[withdrawIndex].operatorIndex
                 ].operatorAddress ==
                 msg.sender,
-            "msg sender not relayer or operator!"
+            "not relayer or operator!"
         );
         _;
     }
@@ -115,15 +115,15 @@ contract GatewayUpgradeable {
             !peginTxUsed[peginTxid],
             "this pegin tx has already been posted"
         );
-        peginTxUsed[peginTxid] = true;
 
         // validate pegin tx
         require(
             MerkleProof.verify(proof, bitcoinSPV.blockHash(height), leaf),
-            "Unable to verify"
+            "unable to verify"
         );
 
         // record pegin tx data
+        peginTxUsed[peginTxid] = true;
         peginDataMap[++globalPeginIndex] = PeginData({
             peginTxid: peginTxid,
             peginAmount: peginAmountSats,
@@ -158,7 +158,7 @@ contract GatewayUpgradeable {
         uint256 PeginIndex,
         OperatorData[] calldata operatorData
     ) external onlyRelayer returns (uint[] memory operatorIndex) {
-        for (uint256 i = 0; i < operatorData.length; i++) {
+        for (uint256 i; i < operatorData.length; ++i) {
             operatorIndex[i] = postOperatorData(PeginIndex, operatorData[i]);
         }
     }
@@ -230,27 +230,28 @@ contract GatewayUpgradeable {
             operatorIndex < peginData.operatorNum,
             "operator index out of range"
         );
-        OperatorData storage operatorData = operatorDataMap[peginIndex][
-            operatorIndex
-        ];
         require(
             withdrawData.status == WithdrawStatus.Initialized,
             "invalid withdraw index: not at init stage"
         );
+        require(
+            MerkleProof.verify(proof, bitcoinSPV.blockHash(height), leaf),
+            "unable to verify"
+        );
 
+        OperatorData storage operatorData = operatorDataMap[peginIndex][
+            operatorIndex
+        ];
         bytes32 kickoffTxid = BitvmTxParser.parseKickoffTx(rawKickoffTx);
         require(
             kickoffTxid == operatorData.kickoffTxid,
             "kickoff txid mismatch"
         );
-        require(
-            MerkleProof.verify(proof, bitcoinSPV.blockHash(height), leaf),
-            "Unable to verify"
-        );
 
         // once kickoff is braodcasted , operator will not be able to cancel withdrawal
         withdrawData.status = WithdrawStatus.Processing;
         operatorWithdrawn[peginIndex][operatorIndex] = true;
+
         // TODO: burn pegBTC ?
     }
 
@@ -269,19 +270,22 @@ contract GatewayUpgradeable {
             operatorIndex < peginData.operatorNum,
             "operator index out of range"
         );
-        OperatorData storage operatorData = operatorDataMap[peginIndex][
-            operatorIndex
-        ];
         require(
             withdrawData.status == WithdrawStatus.Processing,
             "invalid withdraw index: not at processing stage"
         );
-
-        bytes32 take1Txid = BitvmTxParser.parseTake1Tx(rawTake1Tx);
-        require(take1Txid == operatorData.take1Txid, "take1 txid mismatch");
         require(
             MerkleProof.verify(proof, bitcoinSPV.blockHash(height), leaf),
-            "Unable to verify"
+            "unable to verify"
+        );
+
+        OperatorData storage operatorData = operatorDataMap[peginIndex][
+            operatorIndex
+        ];
+        bytes32 take1Txid = BitvmTxParser.parseTake1Tx(rawTake1Tx);
+        require(
+            BitvmTxParser.parseTake1Tx(rawTake1Tx) == operatorData.take1Txid,
+            "take1 txid mismatch"
         );
 
         peginData.status = PeginStatus.Claimed;
@@ -303,20 +307,20 @@ contract GatewayUpgradeable {
             operatorIndex < peginData.operatorNum,
             "operator index out of range"
         );
-        OperatorData storage operatorData = operatorDataMap[peginIndex][
-            operatorIndex
-        ];
         require(
             withdrawData.status == WithdrawStatus.Processing,
             "invalid withdraw index: not at processing stage"
         );
-
-        bytes32 take2Txid = BitvmTxParser.parseTake2Tx(rawTake2Tx);
-        require(take2Txid == operatorData.take2Txid, "take2 txid mismatch");
         require(
             MerkleProof.verify(proof, bitcoinSPV.blockHash(height), leaf),
-            "Unable to verify"
+            "unable to verify"
         );
+
+        OperatorData storage operatorData = operatorDataMap[peginIndex][
+            operatorIndex
+        ];
+        bytes32 take2Txid = BitvmTxParser.parseTake2Tx(rawTake2Tx);
+        require(take2Txid == operatorData.take2Txid, "take2 txid mismatch");
 
         peginData.status = PeginStatus.Claimed;
         withdrawData.status = WithdrawStatus.Complete;
@@ -337,23 +341,23 @@ contract GatewayUpgradeable {
             operatorIndex < peginData.operatorNum,
             "operator index out of range"
         );
-        OperatorData storage operatorData = operatorDataMap[peginIndex][
-            operatorIndex
-        ];
         require(
             withdrawData.status == WithdrawStatus.Processing,
             "invalid withdraw index: not at processing stage"
         );
+        require(
+            MerkleProof.verify(proof, bitcoinSPV.blockHash(height), leaf),
+            "unable to verify"
+        );
 
+        OperatorData storage operatorData = operatorDataMap[peginIndex][
+            operatorIndex
+        ];
         (bytes32 disproveTxid, bytes32 assertFinalTxid) = BitvmTxParser
             .parseDisproveTx(rawDisproveTx);
         require(
             assertFinalTxid == operatorData.assertFinalTxid,
             "disprove txid mismatch"
-        );
-        require(
-            MerkleProof.verify(proof, bitcoinSPV.blockHash(height), leaf),
-            "Unable to verify"
         );
 
         peginData.status = PeginStatus.Withdrawbale;
