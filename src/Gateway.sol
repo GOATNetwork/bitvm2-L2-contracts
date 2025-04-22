@@ -96,6 +96,48 @@ contract GatewayUpgradeable {
         _;
     }
 
+    function getInitializedInstanceIds()
+        external
+        view
+        returns (bytes16[] memory retInstanceIds, bytes16[] memory retGraphIds)
+    {
+        uint256 count;
+        // First pass to count matching entries
+        for (uint256 i = 0; i < instanceIds.length; ++i) {
+            bytes16 instanceId = instanceIds[i];
+            bytes16[] memory graphIds = instanceIdToGraphIds[instanceId];
+            for (uint256 j = 0; j < graphIds.length; ++j) {
+                bytes16 graphId = graphIds[j];
+                if (
+                    withdrawDataMap[graphId].status ==
+                    WithdrawStatus.Initialized
+                ) {
+                    count++;
+                }
+            }
+        }
+
+        // Second pass to populate return arrays
+        retInstanceIds = new bytes16[](count);
+        retGraphIds = new bytes16[](count);
+        uint256 index;
+        for (uint256 i = 0; i < instanceIds.length; ++i) {
+            bytes16 instanceId = instanceIds[i];
+            bytes16[] memory graphIds = instanceIdToGraphIds[instanceId];
+            for (uint256 j = 0; j < graphIds.length; ++j) {
+                bytes16 graphId = graphIds[j];
+                if (
+                    withdrawDataMap[graphId].status ==
+                    WithdrawStatus.Initialized
+                ) {
+                    retInstanceIds[index] = instanceId;
+                    retGraphIds[index] = graphId;
+                    index++;
+                }
+            }
+        }
+    }
+
     function getInstanceIdsByPubKey(
         bytes32 operatorPubkey
     )

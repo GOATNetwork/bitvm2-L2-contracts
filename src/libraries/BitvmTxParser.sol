@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.27;
 
+import {Constants} from "../Constants.sol";
+
 library BitvmTxParser {
     struct BitcoinTx {
         bytes4 version;
@@ -24,22 +26,35 @@ library BitvmTxParser {
         bytes memory txouts = bitcoinTx.outputVector;
 
         //  memory layout of bitcoinTx.outputVector:
-        // | outputVector.length(32-bytes) | outputcount(1-byte).[amount(8-bytes).scriptpubkeysize(compact-bytes).scriptpubkey(x-bytes); n]
+        // | outputVector.length(32-bytes) | outputcount(compact-size).[amount(8-bytes).scriptpubkeysize(compact-size).scriptpubkey(x-bytes); n]
         // peginAmountSats is the amount of txout[0]
-        uint64 peginAmountSatsRev = uint64(bytes8(memLoad(txouts, 33))); // 33 = 32 + 1
-        (uint scriptpubkeysize, uint offset) = parseCompactSize(txouts, 41); // 42 = 32 + 1 + 8
+        (, uint offset) = parseCompactSize(txouts, 32);
+        uint64 peginAmountSatsRev = uint64(bytes8(memLoad(txouts, offset)));
+        uint scriptpubkeysize;
+        (scriptpubkeysize, offset) = parseCompactSize(txouts, offset + 8);
         uint nextTxinOffset = scriptpubkeysize + offset;
 
         // depositorAddress is op_return data of txout[1]
-        // Bitvm pegin OP_RETURN script (22-bytes):
-        // OP_RETURN OP_PUSHBYTES20 {depositorAddress(20-bytes)}
-        // scriptpubkeysize = 22 < 0xfc , compact-size-bytes-len = 1
+        // Bitvm pegin OP_RETURN script (30-bytes):
+        // OP_RETURN OP_PUSHBYTES28 {magic-bytes(8-bytes)} {depositorAddress(20-bytes)}
+        (uint opReturnScriptSize, uint opReturnScriptOffset) = parseCompactSize(
+            txouts,
+            nextTxinOffset + 8
+        );
+        bytes2 firstTwoOpcode = bytes2(memLoad(txouts, opReturnScriptOffset));
+        require(
+            opReturnScriptSize == 30 && firstTwoOpcode == 0x6a1c,
+            "invalid OP_RETURN script"
+        );
+        require(
+            bytes8(memLoad(txouts, opReturnScriptOffset + 2)) ==
+                Constants.magic_bytes,
+            "magic_bytes mismatch"
+        );
         depositorAddress = address(
-            bytes20(memLoad(txouts, nextTxinOffset + 11))
-        ); // 11 = 8 + 1 + 2
+            bytes20(memLoad(txouts, opReturnScriptOffset + 10))
+        );
         peginAmountSats = reverseUint64(peginAmountSatsRev);
-
-        // TODO: overflow check
     }
 
     function parseKickoffTx(
@@ -67,10 +82,9 @@ library BitvmTxParser {
         bytes memory txin = bitcoinTx.inputVector;
         // assertFinalTxid is txid of the txin[0]
         //  memory layout of bitcoinTx.inputVector:
-        // | inputVector.length(32-bytes) | inputcount(1-byte).input_0_txid(32-bytes)...
-        assertFinalTxid = memLoad(txin, 33); // 33 = 32 + 1
-
-        // TODO: overflow check
+        // | inputVector.length(32-bytes) | inputcount(compact-size).input_0_txid(32-bytes)...
+        (, uint offset) = parseCompactSize(txin, 32);
+        assertFinalTxid = memLoad(txin, offset);
     }
 
     function computeTxid(
