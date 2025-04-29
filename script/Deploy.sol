@@ -25,7 +25,8 @@ contract TaskTest is Script {
         deployer = vm.createWallet(deployerPrivateKey).addr;
         vm.startBroadcast(deployerPrivateKey);
 
-        deploy();
+        // deploy();
+        deployLogic();
 
         vm.stopBroadcast();
     }
@@ -47,5 +48,15 @@ contract TaskTest is Script {
         gateway = GatewayUpgradeable(payable(proxy));
 
         console.log("Gateway contract address: ", address(gateway));
+    }
+
+    function deployLogic() public {
+        address pegBTC = vm.envAddress("PEG_BTC");
+        GatewayUpgradeable gateway = new GatewayUpgradeable(
+            IERC20(pegBTC),
+            IBitcoinSPV(bitcoinSPV),
+            relayer
+        );
+        console.log("Gateway logic address: ", address(gateway));
     }
 }
