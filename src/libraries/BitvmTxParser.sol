@@ -98,9 +98,11 @@ library BitvmTxParser {
         );
         return hash256(rawTx);
     }
+
     function hash256(bytes memory raw) internal pure returns (bytes32) {
         return sha256(abi.encodePacked(sha256(raw)));
     }
+
     function memLoad(
         bytes memory data,
         uint offset
@@ -109,6 +111,7 @@ library BitvmTxParser {
             res := mload(add(data, offset))
         }
     }
+
     function reverseUint64(uint64 _b) internal pure returns (uint64 v) {
         v = _b;
         // swap bytes
@@ -118,6 +121,7 @@ library BitvmTxParser {
         // swap 4-byte long pairs
         v = (v >> 32) | (v << 32);
     }
+
     function reverseUint32(uint32 _b) internal pure returns (uint32 v) {
         v = _b;
 
@@ -126,9 +130,11 @@ library BitvmTxParser {
         // swap 2-byte long pairs
         v = (v >> 16) | (v << 16);
     }
+
     function reverseUint16(uint16 _b) internal pure returns (uint16 v) {
         v = (_b << 8) | (_b >> 8);
     }
+
     function parseCompactSize(
         bytes memory data,
         uint offset

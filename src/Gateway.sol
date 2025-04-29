@@ -96,6 +96,10 @@ contract GatewayUpgradeable {
         _;
     }
 
+    function getBlockHash(uint256 height) external view returns (bytes32) {
+        return bitcoinSPV.blockHash(height);
+    }
+
     function getInitializedInstanceIds()
         external
         view
@@ -249,6 +253,7 @@ contract GatewayUpgradeable {
     function postPeginData(
         bytes16 instanceId,
         BitvmTxParser.BitcoinTx calldata rawPeginTx,
+        bytes calldata rawHeader,
         uint256 height,
         bytes32[] calldata proof,
         uint256 index
@@ -270,13 +275,12 @@ contract GatewayUpgradeable {
         );
 
         // validate pegin tx
+        (bytes32 blockHash, bytes32 merkleRoot) = parseBtcBlockHeader(
+            rawHeader
+        );
+        require(bitcoinSPV.blockHash(height) == blockHash, "invalid header");
         require(
-            verifyMerkleProof(
-                bitcoinSPV.blockHash(height),
-                proof,
-                peginTxid,
-                index
-            ),
+            verifyMerkleProof(merkleRoot, proof, peginTxid, index),
             "unable to verify"
         );
 
@@ -375,6 +379,7 @@ contract GatewayUpgradeable {
     function proceedWithdraw(
         bytes16 graphId,
         BitvmTxParser.BitcoinTx calldata rawKickoffTx,
+        bytes calldata rawHeader,
         uint256 height,
         bytes32[] calldata proof,
         uint256 index
@@ -393,13 +398,12 @@ contract GatewayUpgradeable {
             kickoffTxid == operatorData.kickoffTxid,
             "kickoff txid mismatch"
         );
+        (bytes32 blockHash, bytes32 merkleRoot) = parseBtcBlockHeader(
+            rawHeader
+        );
+        require(bitcoinSPV.blockHash(height) == blockHash, "invalid header");
         require(
-            verifyMerkleProof(
-                bitcoinSPV.blockHash(height),
-                proof,
-                kickoffTxid,
-                index
-            ),
+            verifyMerkleProof(merkleRoot, proof, kickoffTxid, index),
             "unable to verify"
         );
 
@@ -413,6 +417,7 @@ contract GatewayUpgradeable {
     function finishWithdrawHappyPath(
         bytes16 graphId,
         BitvmTxParser.BitcoinTx calldata rawTake1Tx,
+        bytes calldata rawHeader,
         uint256 height,
         bytes32[] calldata proof,
         uint256 index
@@ -431,13 +436,12 @@ contract GatewayUpgradeable {
             BitvmTxParser.parseTake1Tx(rawTake1Tx) == operatorData.take1Txid,
             "take1 txid mismatch"
         );
+        (bytes32 blockHash, bytes32 merkleRoot) = parseBtcBlockHeader(
+            rawHeader
+        );
+        require(bitcoinSPV.blockHash(height) == blockHash, "invalid header");
         require(
-            verifyMerkleProof(
-                bitcoinSPV.blockHash(height),
-                proof,
-                take1Txid,
-                index
-            ),
+            verifyMerkleProof(merkleRoot, proof, take1Txid, index),
             "unable to verify"
         );
 
@@ -448,6 +452,7 @@ contract GatewayUpgradeable {
     function finishWithdrawUnhappyPath(
         bytes16 graphId,
         BitvmTxParser.BitcoinTx calldata rawTake2Tx,
+        bytes calldata rawHeader,
         uint256 height,
         bytes32[] calldata proof,
         uint256 index
@@ -463,13 +468,12 @@ contract GatewayUpgradeable {
         OperatorData storage operatorData = operatorDataMap[graphId];
         bytes32 take2Txid = BitvmTxParser.parseTake2Tx(rawTake2Tx);
         require(take2Txid == operatorData.take2Txid, "take2 txid mismatch");
+        (bytes32 blockHash, bytes32 merkleRoot) = parseBtcBlockHeader(
+            rawHeader
+        );
+        require(bitcoinSPV.blockHash(height) == blockHash, "invalid header");
         require(
-            verifyMerkleProof(
-                bitcoinSPV.blockHash(height),
-                proof,
-                take2Txid,
-                index
-            ),
+            verifyMerkleProof(merkleRoot, proof, take2Txid, index),
             "unable to verify"
         );
 
@@ -480,6 +484,7 @@ contract GatewayUpgradeable {
     function finishWithdrawDisproved(
         bytes16 graphId,
         BitvmTxParser.BitcoinTx calldata rawDisproveTx,
+        bytes calldata rawHeader,
         uint256 height,
         bytes32[] calldata proof,
         uint256 index
@@ -499,18 +504,24 @@ contract GatewayUpgradeable {
             assertFinalTxid == operatorData.assertFinalTxid,
             "disprove txid mismatch"
         );
+        (bytes32 blockHash, bytes32 merkleRoot) = parseBtcBlockHeader(
+            rawHeader
+        );
+        require(bitcoinSPV.blockHash(height) == blockHash, "invalid header");
         require(
-            verifyMerkleProof(
-                bitcoinSPV.blockHash(height),
-                proof,
-                assertFinalTxid,
-                index
-            ),
+            verifyMerkleProof(merkleRoot, proof, assertFinalTxid, index),
             "unable to verify"
         );
 
         peginData.status = PeginStatus.Withdrawbale;
         withdrawData.status = WithdrawStatus.Disproved;
+    }
+
+    function parseBtcBlockHeader(
+        bytes calldata rawHeader
+    ) public pure returns (bytes32 blockHash, bytes32 merkleRoot) {
+        blockHash = BitvmTxParser.hash256(rawHeader);
+        merkleRoot = BitvmTxParser.memLoad(rawHeader, 0x44);
     }
 
     function verifyMerkleProof(
