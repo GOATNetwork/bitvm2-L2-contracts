@@ -2,7 +2,7 @@ pragma solidity ^0.8.0;
 
 import {Script, console} from "forge-std/Script.sol";
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IPegBTC} from "../src/interfaces/IPegBTC.sol";
 import {IBitcoinSPV} from "../src/interfaces/IBitcoinSPV.sol";
 
 import {GatewayUpgradeable} from "../src/Gateway.sol";
@@ -36,8 +36,8 @@ contract TaskTest is Script {
         PegBTC pegBTC = new PegBTC(deployer);
 
         GatewayUpgradeable gateway = new GatewayUpgradeable(
-            IERC20(pegBTC),
-            IBitcoinSPV(bitcoinSPV),
+            address(pegBTC),
+            bitcoinSPV,
             relayer
         );
         UpgradeableProxy proxy = new UpgradeableProxy(
@@ -46,6 +46,7 @@ contract TaskTest is Script {
             ""
         );
         gateway = GatewayUpgradeable(payable(proxy));
+        pegBTC.transferOwnership(address(gateway));
 
         console.log("Gateway contract address: ", address(gateway));
     }
@@ -53,8 +54,8 @@ contract TaskTest is Script {
     function deployLogic() public {
         address pegBTC = vm.envAddress("PEG_BTC");
         GatewayUpgradeable gateway = new GatewayUpgradeable(
-            IERC20(pegBTC),
-            IBitcoinSPV(bitcoinSPV),
+            pegBTC,
+            bitcoinSPV,
             relayer
         );
         console.log("Gateway logic address: ", address(gateway));

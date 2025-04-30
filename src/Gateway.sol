@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.27;
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-
 import {IBitcoinSPV} from "./interfaces/IBitcoinSPV.sol";
+import {IPegBTC} from "./interfaces/IPegBTC.sol";
 import {Converter} from "./libraries/Converter.sol";
 import {BitvmPolicy} from "./libraries/BitvmPolicy.sol";
 import {BitvmTxParser} from "./libraries/BitvmTxParser.sol";
@@ -53,7 +52,7 @@ contract GatewayUpgradeable {
         bytes32 take2Txid;
     }
 
-    IERC20 public immutable pegBTC;
+    IPegBTC public immutable pegBTC;
     IBitcoinSPV public immutable bitcoinSPV;
     address public immutable relayer;
 
@@ -68,9 +67,9 @@ contract GatewayUpgradeable {
     mapping(bytes16 instanceId => bytes16[] graphIds)
         public instanceIdToGraphIds;
 
-    constructor(IERC20 _pegBTC, IBitcoinSPV _bitcoinSPV, address _relayer) {
-        pegBTC = _pegBTC;
-        bitcoinSPV = _bitcoinSPV;
+    constructor(address _pegBTC, address _bitcoinSPV, address _relayer) {
+        pegBTC = IPegBTC(_pegBTC);
+        bitcoinSPV = IBitcoinSPV(_bitcoinSPV);
         relayer = _relayer;
     }
 
@@ -293,8 +292,11 @@ contract GatewayUpgradeable {
         });
         instanceIds.push(instanceId);
 
-        // mint / send pegBTC to user
-        pegBTC.transfer(depositorAddress, peginAmountSats);
+        // mint pegBTC to user
+        pegBTC.mint(
+            depositorAddress,
+            Converter.amountFromSats(peginAmountSats)
+        );
     }
 
     function postOperatorData(
@@ -411,7 +413,8 @@ contract GatewayUpgradeable {
         withdrawData.status = WithdrawStatus.Processing;
         operatorWithdrawn[graphId] = true;
 
-        // TODO: burn pegBTC ?
+        // burn pegBTC
+        pegBTC.burn(withdrawData.lockAmount);
     }
 
     function finishWithdrawHappyPath(
