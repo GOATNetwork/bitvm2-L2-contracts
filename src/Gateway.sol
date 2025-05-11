@@ -2,14 +2,16 @@
 pragma solidity ^0.8.27;
 
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
 
 import {IBitcoinSPV} from "./interfaces/IBitcoinSPV.sol";
 import {IPegBTC} from "./interfaces/IPegBTC.sol";
 import {Converter} from "./libraries/Converter.sol";
-import {BitvmPolicy} from "./libraries/BitvmPolicy.sol";
 import {BitvmTxParser} from "./libraries/BitvmTxParser.sol";
 
 contract GatewayUpgradeable is OwnableUpgradeable {
+    using EnumerableMap for EnumerableMap.UintToAddressMap;
+
     enum PeginStatus {
         None,
         Processing,
@@ -59,6 +61,9 @@ contract GatewayUpgradeable is OwnableUpgradeable {
 
     address public relayer;
     uint64 public minStakeAmountSats;
+
+    EnumerableMap.UintToAddressMap private committeePeerId;
+    mapping(uint256 => address) public operatorPeerId;
 
     mapping(bytes32 => bool) public peginTxUsed;
     mapping(bytes16 instanceId => PeginData) public peginDataMap;
@@ -112,6 +117,30 @@ contract GatewayUpgradeable is OwnableUpgradeable {
     function setRelayer(address _relayer) external onlyOwner {
         require(_relayer != address(0), "invalid relayer");
         relayer = _relayer;
+    }
+
+    function setCommitteePeerId(
+        uint256 id,
+        address committee
+    ) external onlyOwner {
+        require(committee != address(0), "invalid committee");
+        committeePeerId.set(id, committee);
+    }
+
+    function setOperatorPeerId(
+        uint256 id,
+        address operator
+    ) external onlyOwner {
+        require(operator != address(0), "invalid operator");
+        operatorPeerId[id] = operator;
+    }
+
+    function getCommitteePeerId(uint256 id) external view returns (address) {
+        return committeePeerId.get(id);
+    }
+
+    function getCommitteePeerIdLength() external view returns (uint256) {
+        return committeePeerId.length();
     }
 
     function getBlockHash(uint256 height) external view returns (bytes32) {
