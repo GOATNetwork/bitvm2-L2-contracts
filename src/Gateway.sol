@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.27;
 
+import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+
 import {IBitcoinSPV} from "./interfaces/IBitcoinSPV.sol";
 import {IPegBTC} from "./interfaces/IPegBTC.sol";
 import {Converter} from "./libraries/Converter.sol";
 import {BitvmPolicy} from "./libraries/BitvmPolicy.sol";
 import {BitvmTxParser} from "./libraries/BitvmTxParser.sol";
 
-contract GatewayUpgradeable {
+contract GatewayUpgradeable is OwnableUpgradeable {
     enum PeginStatus {
         None,
         Processing,
@@ -54,7 +56,9 @@ contract GatewayUpgradeable {
 
     IPegBTC public immutable pegBTC;
     IBitcoinSPV public immutable bitcoinSPV;
-    address public immutable relayer;
+
+    address public relayer;
+    uint64 public minStakeAmountSats;
 
     mapping(bytes32 => bool) public peginTxUsed;
     mapping(bytes16 instanceId => PeginData) public peginDataMap;
@@ -71,6 +75,10 @@ contract GatewayUpgradeable {
         pegBTC = IPegBTC(_pegBTC);
         bitcoinSPV = IBitcoinSPV(_bitcoinSPV);
         relayer = _relayer;
+    }
+
+    function initialize(address _owner) external initializer {
+        __Ownable_init(_owner);
     }
 
     modifier onlyRelayer() {
@@ -93,6 +101,17 @@ contract GatewayUpgradeable {
             "not relayer or operator!"
         );
         _;
+    }
+
+    function setMinStakeAmountSats(
+        uint64 _minStakeAmountSats
+    ) external onlyOwner {
+        minStakeAmountSats = _minStakeAmountSats;
+    }
+
+    function setRelayer(address _relayer) external onlyOwner {
+        require(_relayer != address(0), "invalid relayer");
+        relayer = _relayer;
     }
 
     function getBlockHash(uint256 height) external view returns (bytes32) {
@@ -310,10 +329,11 @@ contract GatewayUpgradeable {
             "operator data pegin txid mismatch"
         );
         require(
-            BitvmPolicy.isValidStakeAmount(operatorData.stakeAmount),
+            operatorData.stakeAmount >= minStakeAmountSats,
             "insufficient stake amount"
         );
         operatorDataMap[graphId] = operatorData;
+        instanceIdToGraphIds[instanceId].push(graphId);
     }
 
     function postOperatorDataBatch(
@@ -359,8 +379,6 @@ contract GatewayUpgradeable {
         withdrawData.status = WithdrawStatus.Initialized;
         withdrawData.instanceId = instanceId;
         withdrawData.lockAmount = lockAmount;
-
-        instanceIdToGraphIds[instanceId].push(graphId);
     }
 
     function cancelWithdraw(
