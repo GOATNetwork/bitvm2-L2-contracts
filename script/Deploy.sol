@@ -37,8 +37,7 @@ contract TaskTest is Script {
 
         GatewayUpgradeable gateway = new GatewayUpgradeable(
             address(pegBTC),
-            bitcoinSPV,
-            relayer
+            bitcoinSPV
         );
         UpgradeableProxy proxy = new UpgradeableProxy(
             address(gateway),
@@ -53,11 +52,7 @@ contract TaskTest is Script {
 
     function deployLogic() public {
         address pegBTC = vm.envAddress("PEG_BTC");
-        GatewayUpgradeable gateway = new GatewayUpgradeable(
-            pegBTC,
-            bitcoinSPV,
-            relayer
-        );
+        GatewayUpgradeable gateway = new GatewayUpgradeable(pegBTC, bitcoinSPV);
         console.log("Gateway logic address: ", address(gateway));
     }
 }

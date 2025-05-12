@@ -22,13 +22,14 @@ contract MerkleTest is Test {
         // deploy contracts
         PegBTC pegBTC = new PegBTC(admin);
 
-        gateway = new GatewayUpgradeable(address(pegBTC), address(0), relayer);
+        gateway = new GatewayUpgradeable(address(pegBTC), address(0));
         UpgradeableProxy proxy = new UpgradeableProxy(
             address(gateway),
             admin,
             ""
         );
         gateway = GatewayUpgradeable(payable(proxy));
+        gateway.initialize(admin, relayer, "");
     }
 
     function test_MerklProof() public {

@@ -2,7 +2,7 @@
 pragma solidity ^0.8.27;
 
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
+import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 import {IBitcoinSPV} from "./interfaces/IBitcoinSPV.sol";
 import {IPegBTC} from "./interfaces/IPegBTC.sol";
@@ -10,7 +10,7 @@ import {Converter} from "./libraries/Converter.sol";
 import {BitvmTxParser} from "./libraries/BitvmTxParser.sol";
 
 contract GatewayUpgradeable is OwnableUpgradeable {
-    using EnumerableMap for EnumerableMap.UintToAddressMap;
+    using EnumerableSet for EnumerableSet.Bytes32Set;
 
     enum PeginStatus {
         None,
@@ -60,10 +60,11 @@ contract GatewayUpgradeable is OwnableUpgradeable {
     IBitcoinSPV public immutable bitcoinSPV;
 
     address public relayer;
+    bytes public relayerPeerId;
     uint64 public minStakeAmountSats;
 
-    EnumerableMap.UintToAddressMap private committeePeerId;
-    mapping(uint256 => address) public operatorPeerId;
+    EnumerableSet.Bytes32Set private committeePeerId;
+    EnumerableSet.Bytes32Set private operatorPeerId;
 
     mapping(bytes32 => bool) public peginTxUsed;
     mapping(bytes16 instanceId => PeginData) public peginDataMap;
@@ -76,14 +77,19 @@ contract GatewayUpgradeable is OwnableUpgradeable {
     mapping(bytes16 instanceId => bytes16[] graphIds)
         public instanceIdToGraphIds;
 
-    constructor(address _pegBTC, address _bitcoinSPV, address _relayer) {
+    constructor(address _pegBTC, address _bitcoinSPV) {
         pegBTC = IPegBTC(_pegBTC);
         bitcoinSPV = IBitcoinSPV(_bitcoinSPV);
-        relayer = _relayer;
     }
 
-    function initialize(address _owner) external initializer {
-        __Ownable_init(_owner);
+    function initialize(
+        address owner,
+        address newRelayer,
+        bytes calldata peerId
+    ) external initializer {
+        __Ownable_init(owner);
+        relayer = newRelayer;
+        relayerPeerId = peerId;
     }
 
     modifier onlyRelayer() {
@@ -114,33 +120,53 @@ contract GatewayUpgradeable is OwnableUpgradeable {
         minStakeAmountSats = _minStakeAmountSats;
     }
 
-    function setRelayer(address _relayer) external onlyOwner {
-        require(_relayer != address(0), "invalid relayer");
-        relayer = _relayer;
-    }
-
-    function setCommitteePeerId(
-        uint256 id,
-        address committee
+    function setRelayer(
+        address newRelayer,
+        bytes calldata peerId
     ) external onlyOwner {
-        require(committee != address(0), "invalid committee");
-        committeePeerId.set(id, committee);
+        require(newRelayer != address(0), "invalid relayer");
+        relayer = newRelayer;
+        relayerPeerId = peerId;
     }
 
-    function setOperatorPeerId(
-        uint256 id,
-        address operator
-    ) external onlyOwner {
-        require(operator != address(0), "invalid operator");
-        operatorPeerId[id] = operator;
+    function addCommitteePeerId(bytes calldata id) external onlyOwner {
+        require(id.length > 0, "invalid id");
+        bytes32 idHash = keccak256(id);
+        committeePeerId.add(idHash);
     }
 
-    function getCommitteePeerId(uint256 id) external view returns (address) {
-        return committeePeerId.get(id);
+    function removeCommitteePeerId(bytes calldata id) external onlyOwner {
+        bytes32 idHash = keccak256(id);
+        require(committeePeerId.remove(idHash), "not committee");
     }
 
-    function getCommitteePeerIdLength() external view returns (uint256) {
+    function addOperatorPeerId(bytes calldata id) external onlyOwner {
+        require(id.length > 0, "invalid id");
+        bytes32 idHash = keccak256(id);
+        operatorPeerId.add(idHash);
+    }
+
+    function removeOperatorPeerId(bytes calldata id) external onlyOwner {
+        bytes32 idHash = keccak256(id);
+        require(operatorPeerId.remove(idHash), "not operator");
+    }
+
+    function isCommittee(bytes calldata id) external view returns (bool) {
+        bytes32 idHash = keccak256(id);
+        return committeePeerId.contains(idHash);
+    }
+
+    function getCommitteeLength() external view returns (uint256) {
         return committeePeerId.length();
+    }
+
+    function isOperator(bytes calldata id) external view returns (bool) {
+        bytes32 idHash = keccak256(id);
+        return operatorPeerId.contains(idHash);
+    }
+
+    function getOperatorLength() external view returns (uint256) {
+        return operatorPeerId.length();
     }
 
     function getBlockHash(uint256 height) external view returns (bytes32) {
