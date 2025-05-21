@@ -25,8 +25,8 @@ contract TaskTest is Script {
         deployer = vm.createWallet(deployerPrivateKey).addr;
         vm.startBroadcast(deployerPrivateKey);
 
-        // deploy();
-        deployLogic();
+        deploy();
+        // deployLogic();
 
         vm.stopBroadcast();
     }
@@ -45,7 +45,7 @@ contract TaskTest is Script {
             ""
         );
         gateway = GatewayUpgradeable(payable(proxy));
-        pegBTC.transferOwnership(address(gateway));
+        // pegBTC.transferOwnership(address(gateway));
 
         console.log("Gateway contract address: ", address(gateway));
     }
