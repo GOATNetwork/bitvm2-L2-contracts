@@ -173,6 +173,10 @@ contract GatewayUpgradeable is OwnableUpgradeable {
         return bitcoinSPV.blockHash(height);
     }
 
+    function getGraphIdsByInstanceId(bytes16 instanceId) external view returns (bytes16[] memory) {
+        return instanceIdToGraphIds[instanceId];
+    }
+
     function getInitializedInstanceIds()
         external
         view
