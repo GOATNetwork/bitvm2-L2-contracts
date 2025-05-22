@@ -572,10 +572,7 @@ contract GatewayUpgradeable is OwnableUpgradeable {
         WithdrawData storage withdrawData = withdrawDataMap[graphId];
         bytes16 instanceId = withdrawData.instanceId;
         PeginData storage peginData = peginDataMap[instanceId];
-        require(
-            withdrawData.status == WithdrawStatus.Processing,
-            "invalid withdraw index: not at processing stage"
-        );
+        // Malicious operator may skip initWithdraw & procceedWithdraw
 
         OperatorData storage operatorData = operatorDataMap[graphId];
         (bytes32 disproveTxid, bytes32 assertFinalTxid) = BitvmTxParser
@@ -593,7 +590,6 @@ contract GatewayUpgradeable is OwnableUpgradeable {
             "unable to verify"
         );
 
-        peginData.status = PeginStatus.Withdrawbale;
         withdrawData.status = WithdrawStatus.Disproved;
     }
 
