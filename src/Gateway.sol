@@ -579,14 +579,14 @@ contract GatewayUpgradeable is OwnableUpgradeable {
             .parseDisproveTx(rawDisproveTx);
         require(
             assertFinalTxid == operatorData.assertFinalTxid,
-            "disprove txid mismatch"
+            "Assert-Final txid mismatch"
         );
         (bytes32 blockHash, bytes32 merkleRoot) = parseBtcBlockHeader(
             rawHeader
         );
         require(bitcoinSPV.blockHash(height) == blockHash, "invalid header");
         require(
-            verifyMerkleProof(merkleRoot, proof, assertFinalTxid, index),
+            verifyMerkleProof(merkleRoot, proof, disproveTxid, index),
             "unable to verify"
         );
 
