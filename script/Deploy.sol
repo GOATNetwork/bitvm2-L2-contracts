@@ -25,8 +25,8 @@ contract TaskTest is Script {
         deployer = vm.createWallet(deployerPrivateKey).addr;
         vm.startBroadcast(deployerPrivateKey);
 
-        deploy();
-        // deployLogic();
+        // deploy();
+        deployLogic();
 
         vm.stopBroadcast();
     }
