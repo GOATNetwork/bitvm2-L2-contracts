@@ -327,6 +327,8 @@ contract GatewayUpgradeable is OwnableUpgradeable {
         }
     }
 
+    event BridgeIn(address indexed depositorAddress, bytes16 indexed instanceId, uint64 indexed peginAmountSats);
+
     function postPeginData(
         bytes16 instanceId,
         BitvmTxParser.BitcoinTx calldata rawPeginTx,
@@ -375,6 +377,8 @@ contract GatewayUpgradeable is OwnableUpgradeable {
             depositorAddress,
             Converter.amountFromSats(peginAmountSats)
         );
+
+        emit BridgeIn(depositorAddress, instanceId, peginAmountSats);
     }
 
     function postOperatorData(
@@ -409,6 +413,10 @@ contract GatewayUpgradeable is OwnableUpgradeable {
         }
     }
 
+    event InitWithdraw(
+        bytes16 indexed instanceId, bytes16 indexed graphId, address indexed operatorAddress, uint64 withdrawAmountSats
+    );
+
     function initWithdraw(bytes16 instanceId, bytes16 graphId) external {
         WithdrawData storage withdrawData = withdrawDataMap[graphId];
         require(
@@ -438,7 +446,11 @@ contract GatewayUpgradeable is OwnableUpgradeable {
         withdrawData.status = WithdrawStatus.Initialized;
         withdrawData.instanceId = instanceId;
         withdrawData.lockAmount = lockAmount;
+        
+        emit InitWithdraw(instanceId, graphId, withdrawData.operatorAddress, peginData.peginAmount);
     }
+
+    event CancelWithdraw(bytes16 indexed instanceId, bytes16 indexed graphId, address indexed triggerAddress);
 
     function cancelWithdraw(
         bytes16 graphId
@@ -452,7 +464,11 @@ contract GatewayUpgradeable is OwnableUpgradeable {
         withdrawData.status = WithdrawStatus.Canceled;
         pegBTC.transfer(msg.sender, withdrawData.lockAmount);
         peginData.status = PeginStatus.Withdrawbale;
+
+        emit CancelWithdraw(withdrawData.instanceId, graphId, msg.sender);
     }
+
+    event ProceedWithdraw(bytes16 indexed instanceId, bytes16 indexed graphId, bytes32 kickoffTxid);
 
     // post kickoff tx
     function proceedWithdraw(
@@ -465,7 +481,6 @@ contract GatewayUpgradeable is OwnableUpgradeable {
     ) external onlyRelayerOrOperator(graphId) {
         WithdrawData storage withdrawData = withdrawDataMap[graphId];
         bytes16 instanceId = withdrawData.instanceId;
-        PeginData storage peginData = peginDataMap[instanceId];
         require(
             withdrawData.status == WithdrawStatus.Initialized,
             "invalid withdraw index: not at init stage"
@@ -492,7 +507,11 @@ contract GatewayUpgradeable is OwnableUpgradeable {
 
         // burn pegBTC
         pegBTC.burn(withdrawData.lockAmount);
+
+        emit ProceedWithdraw(instanceId, graphId, kickoffTxid);
     }
+
+    event WithdrawHappyPath(bytes16 indexed instanceId, bytes16 indexed graphId, bytes32 take1Txid);
 
     function finishWithdrawHappyPath(
         bytes16 graphId,
@@ -527,7 +546,11 @@ contract GatewayUpgradeable is OwnableUpgradeable {
 
         peginData.status = PeginStatus.Claimed;
         withdrawData.status = WithdrawStatus.Complete;
+
+        emit WithdrawHappyPath(instanceId, graphId, take1Txid);
     }
+
+    event WithdrawUnhappyPath(bytes16 indexed instanceId, bytes16 indexed graphId, bytes32 take2Txid);
 
     function finishWithdrawUnhappyPath(
         bytes16 graphId,
@@ -559,7 +582,11 @@ contract GatewayUpgradeable is OwnableUpgradeable {
 
         peginData.status = PeginStatus.Claimed;
         withdrawData.status = WithdrawStatus.Complete;
+
+        emit WithdrawUnhappyPath(instanceId, graphId, take2Txid);
     }
+
+    event WithdrawDisproved(bytes16 indexed instanceId, bytes16 indexed graphId, bytes32 disproveTxid);
 
     function finishWithdrawDisproved(
         bytes16 graphId,
@@ -571,7 +598,6 @@ contract GatewayUpgradeable is OwnableUpgradeable {
     ) external onlyRelayerOrOperator(graphId) {
         WithdrawData storage withdrawData = withdrawDataMap[graphId];
         bytes16 instanceId = withdrawData.instanceId;
-        PeginData storage peginData = peginDataMap[instanceId];
         // Malicious operator may skip initWithdraw & procceedWithdraw
 
         OperatorData storage operatorData = operatorDataMap[graphId];
@@ -591,6 +617,8 @@ contract GatewayUpgradeable is OwnableUpgradeable {
         );
 
         withdrawData.status = WithdrawStatus.Disproved;
+
+        emit WithdrawDisproved(instanceId, graphId, disproveTxid);
     }
 
     function parseBtcBlockHeader(
