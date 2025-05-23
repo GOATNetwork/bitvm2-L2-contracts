@@ -12,6 +12,43 @@ import {BitvmTxParser} from "./libraries/BitvmTxParser.sol";
 contract GatewayUpgradeable is OwnableUpgradeable {
     using EnumerableSet for EnumerableSet.Bytes32Set;
 
+    event BridgeIn(
+        address indexed depositorAddress,
+        bytes16 indexed instanceId,
+        uint64 indexed peginAmountSats
+    );
+    event InitWithdraw(
+        bytes16 indexed instanceId,
+        bytes16 indexed graphId,
+        address indexed operatorAddress,
+        uint64 withdrawAmountSats
+    );
+    event CancelWithdraw(
+        bytes16 indexed instanceId,
+        bytes16 indexed graphId,
+        address indexed triggerAddress
+    );
+    event ProceedWithdraw(
+        bytes16 indexed instanceId,
+        bytes16 indexed graphId,
+        bytes32 kickoffTxid
+    );
+    event WithdrawHappyPath(
+        bytes16 indexed instanceId,
+        bytes16 indexed graphId,
+        bytes32 take1Txid
+    );
+    event WithdrawUnhappyPath(
+        bytes16 indexed instanceId,
+        bytes16 indexed graphId,
+        bytes32 take2Txid
+    );
+    event WithdrawDisproved(
+        bytes16 indexed instanceId,
+        bytes16 indexed graphId,
+        bytes32 disproveTxid
+    );
+
     enum PeginStatus {
         None,
         Processing,
@@ -173,7 +210,9 @@ contract GatewayUpgradeable is OwnableUpgradeable {
         return bitcoinSPV.blockHash(height);
     }
 
-    function getGraphIdsByInstanceId(bytes16 instanceId) external view returns (bytes16[] memory) {
+    function getGraphIdsByInstanceId(
+        bytes16 instanceId
+    ) external view returns (bytes16[] memory) {
         return instanceIdToGraphIds[instanceId];
     }
 
@@ -327,8 +366,6 @@ contract GatewayUpgradeable is OwnableUpgradeable {
         }
     }
 
-    event BridgeIn(address indexed depositorAddress, bytes16 indexed instanceId, uint64 indexed peginAmountSats);
-
     function postPeginData(
         bytes16 instanceId,
         BitvmTxParser.BitcoinTx calldata rawPeginTx,
@@ -413,10 +450,6 @@ contract GatewayUpgradeable is OwnableUpgradeable {
         }
     }
 
-    event InitWithdraw(
-        bytes16 indexed instanceId, bytes16 indexed graphId, address indexed operatorAddress, uint64 withdrawAmountSats
-    );
-
     function initWithdraw(bytes16 instanceId, bytes16 graphId) external {
         WithdrawData storage withdrawData = withdrawDataMap[graphId];
         require(
@@ -446,11 +479,14 @@ contract GatewayUpgradeable is OwnableUpgradeable {
         withdrawData.status = WithdrawStatus.Initialized;
         withdrawData.instanceId = instanceId;
         withdrawData.lockAmount = lockAmount;
-        
-        emit InitWithdraw(instanceId, graphId, withdrawData.operatorAddress, peginData.peginAmount);
-    }
 
-    event CancelWithdraw(bytes16 indexed instanceId, bytes16 indexed graphId, address indexed triggerAddress);
+        emit InitWithdraw(
+            instanceId,
+            graphId,
+            withdrawData.operatorAddress,
+            peginData.peginAmount
+        );
+    }
 
     function cancelWithdraw(
         bytes16 graphId
@@ -467,8 +503,6 @@ contract GatewayUpgradeable is OwnableUpgradeable {
 
         emit CancelWithdraw(withdrawData.instanceId, graphId, msg.sender);
     }
-
-    event ProceedWithdraw(bytes16 indexed instanceId, bytes16 indexed graphId, bytes32 kickoffTxid);
 
     // post kickoff tx
     function proceedWithdraw(
@@ -511,8 +545,6 @@ contract GatewayUpgradeable is OwnableUpgradeable {
         emit ProceedWithdraw(instanceId, graphId, kickoffTxid);
     }
 
-    event WithdrawHappyPath(bytes16 indexed instanceId, bytes16 indexed graphId, bytes32 take1Txid);
-
     function finishWithdrawHappyPath(
         bytes16 graphId,
         BitvmTxParser.BitcoinTx calldata rawTake1Tx,
@@ -550,8 +582,6 @@ contract GatewayUpgradeable is OwnableUpgradeable {
         emit WithdrawHappyPath(instanceId, graphId, take1Txid);
     }
 
-    event WithdrawUnhappyPath(bytes16 indexed instanceId, bytes16 indexed graphId, bytes32 take2Txid);
-
     function finishWithdrawUnhappyPath(
         bytes16 graphId,
         BitvmTxParser.BitcoinTx calldata rawTake2Tx,
@@ -585,8 +615,6 @@ contract GatewayUpgradeable is OwnableUpgradeable {
 
         emit WithdrawUnhappyPath(instanceId, graphId, take2Txid);
     }
-
-    event WithdrawDisproved(bytes16 indexed instanceId, bytes16 indexed graphId, bytes32 disproveTxid);
 
     function finishWithdrawDisproved(
         bytes16 graphId,
