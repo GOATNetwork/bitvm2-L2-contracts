@@ -7,7 +7,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 contract PegBTC is ERC20, Ownable {
     constructor(address owner) Ownable(owner) ERC20("PegBTC", "PBTC") {}
 
-    function mint(address to, uint256 amount) external {
+    function mint(address to, uint256 amount) external onlyOwner {
         _mint(to, amount);
     }
 

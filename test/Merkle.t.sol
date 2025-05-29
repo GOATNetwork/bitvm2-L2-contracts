@@ -8,6 +8,7 @@ import {PegBTC} from "../src/PegBTC.sol";
 import {UpgradeableProxy} from "../src/UpgradeableProxy.sol";
 
 import {IBitcoinSPV} from "../src/interfaces/IBitcoinSPV.sol";
+import {MerkleProof} from "../src/libraries/MerkleProof.sol";
 
 contract MerkleTest is Test {
     GatewayUpgradeable public gateway;
@@ -32,13 +33,13 @@ contract MerkleTest is Test {
         gateway.initialize(admin, relayer, "");
     }
 
-    function test_MerklProof() public {
+    function test_MerklProof() public view {
         bytes32 blockHash = 0x30275a78098ef52810890cf21a006b67e5a06fa3671accf7a723f60000000000;
         bytes32 merkleRoot = 0xefd0e339a15d6bc1de81ac9d879e4ea4ea0525c53dadaa8d1b3f12f1bbd5942f;
         bytes
             memory rawHeader = hex"00003e2060477a7f175bd203f1227aa0460f5cdd4fc17d5eea8835697a67370000000000efd0e339a15d6bc1de81ac9d879e4ea4ea0525c53dadaa8d1b3f12f1bbd5942f03230f68ffff001d46003136";
 
-        (bytes32 parsedBlockHash, bytes32 parsedMerkleRoot) = gateway
+        (bytes32 parsedBlockHash, bytes32 parsedMerkleRoot) = MerkleProof
             .parseBtcBlockHeader(rawHeader);
         assertEq(parsedBlockHash, blockHash);
         assertEq(parsedMerkleRoot, merkleRoot);
@@ -74,7 +75,7 @@ contract MerkleTest is Test {
         ] = 0x47030f03a42b203b699b3fca8154348ecdd0d64a079423cf6e8d07464e0435a0;
         uint256 txIndex = 189;
         assertTrue(
-            gateway.verifyMerkleProof(parsedMerkleRoot, proof, txId, txIndex)
+            MerkleProof.verifyMerkleProof(parsedMerkleRoot, proof, txId, txIndex)
         );
     }
 }
