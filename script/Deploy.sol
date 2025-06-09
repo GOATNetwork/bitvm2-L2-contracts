@@ -35,15 +35,8 @@ contract TaskTest is Script {
         // deploy contracts
         PegBTC pegBTC = new PegBTC(deployer);
 
-        GatewayUpgradeable gateway = new GatewayUpgradeable(
-            address(pegBTC),
-            bitcoinSPV
-        );
-        UpgradeableProxy proxy = new UpgradeableProxy(
-            address(gateway),
-            deployer,
-            ""
-        );
+        GatewayUpgradeable gateway = new GatewayUpgradeable(address(pegBTC), bitcoinSPV);
+        UpgradeableProxy proxy = new UpgradeableProxy(address(gateway), deployer, "");
         gateway = GatewayUpgradeable(payable(proxy));
         // pegBTC.transferOwnership(address(gateway));
 

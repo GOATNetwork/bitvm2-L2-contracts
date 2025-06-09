@@ -9,9 +9,37 @@ import {IPegBTC} from "./interfaces/IPegBTC.sol";
 import {Converter} from "./libraries/Converter.sol";
 import {BitvmTxParser} from "./libraries/BitvmTxParser.sol";
 import {MerkleProof} from "./libraries/MerkleProof.sol";
-import {BitvmPolicy} from "./libraries/BitvmPolicy.sol";
 
-contract GatewayUpgradeable is OwnableUpgradeable {
+contract BitvmPolicy is OwnableUpgradeable {
+    uint64 constant rateMultiplier = 10000;
+
+    uint64 public minStakeAmountSats;
+    uint64 public stakeRate;
+    uint64 public minChallengeAmountSat;
+    uint64 public challengeRate;
+
+    function setStakeAndChallengePolicy(
+        uint64 _minStakeAmountSats,
+        uint64 _stakeRate,
+        uint64 _minChallengeAmountSat,
+        uint64 _challengeRate
+    ) public onlyOwner {
+        minStakeAmountSats = _minStakeAmountSats;
+        stakeRate = _stakeRate;
+        minChallengeAmountSat = _minChallengeAmountSat;
+        challengeRate = _challengeRate;
+    }
+
+    function isValidStakeAmount(uint64 peginAmountSats, uint64 stakeAmountSats) public view returns (bool) {
+        return stakeAmountSats >= minStakeAmountSats + peginAmountSats * stakeRate / rateMultiplier;
+    }
+
+    function isValidChallengeAmount(uint64 peginAmountSats, uint64 challengeAmount) public view returns (bool) {
+        return challengeAmount >= minChallengeAmountSat + peginAmountSats * challengeRate / rateMultiplier;
+    }
+}
+
+contract GatewayUpgradeable is BitvmPolicy {
     using EnumerableSet for EnumerableSet.Bytes32Set;
 
     event BridgeIn(address indexed depositorAddress, bytes16 indexed instanceId, uint64 indexed peginAmountSats);
@@ -27,7 +55,8 @@ contract GatewayUpgradeable is OwnableUpgradeable {
         bytes16 indexed graphId,
         bytes32 disproveTxid,
         bytes32 challengeTxid,
-        address indexed challengerAddress
+        address challengerAddress,
+        address disproverAddress
     );
 
     enum PeginStatus {
@@ -79,7 +108,6 @@ contract GatewayUpgradeable is OwnableUpgradeable {
 
     address public relayer;
     bytes public relayerPeerId;
-    uint64 public minStakeAmountSats;
 
     EnumerableSet.Bytes32Set private committeePeerId;
     EnumerableSet.Bytes32Set private operatorPeerId;
@@ -101,6 +129,12 @@ contract GatewayUpgradeable is OwnableUpgradeable {
 
     function initialize(address owner, address newRelayer, bytes calldata peerId) external initializer {
         __Ownable_init(owner);
+
+        minStakeAmountSats = 3000000; // 0.03 BTC
+        stakeRate = 0; // 0%
+        minChallengeAmountSat = 3000000; // 0.03 BTC
+        challengeRate = 0; // 0%
+
         relayer = newRelayer;
         relayerPeerId = peerId;
     }
@@ -120,10 +154,6 @@ contract GatewayUpgradeable is OwnableUpgradeable {
             msg.sender == relayer || withdrawDataMap[graphId].operatorAddress == msg.sender, "not relayer or operator!"
         );
         _;
-    }
-
-    function setMinStakeAmountSats(uint64 _minStakeAmountSats) external onlyOwner {
-        minStakeAmountSats = _minStakeAmountSats;
     }
 
     function setRelayer(address newRelayer, bytes calldata peerId) external onlyOwner {
@@ -324,7 +354,9 @@ contract GatewayUpgradeable is OwnableUpgradeable {
         // validate pegin tx
         (bytes32 blockHash, bytes32 merkleRoot) = MerkleProof.parseBtcBlockHeader(peginProof.rawHeader);
         require(bitcoinSPV.blockHash(peginProof.height) == blockHash, "invalid header");
-        require(MerkleProof.verifyMerkleProof(merkleRoot, peginProof.proof, peginTxid, peginProof.index), "unable to verify");
+        require(
+            MerkleProof.verifyMerkleProof(merkleRoot, peginProof.proof, peginTxid, peginProof.index), "unable to verify"
+        );
 
         // record pegin tx data
         peginTxUsed[peginTxid] = true;
@@ -333,6 +365,7 @@ contract GatewayUpgradeable is OwnableUpgradeable {
         instanceIds.push(instanceId);
 
         // mint pegBTC to user
+        // TODO: deduct a fee from the User to cover the Operator's peg-out reward
         pegBTC.mint(depositorAddress, Converter.amountFromSats(peginAmountSats));
 
         emit BridgeIn(depositorAddress, instanceId, peginAmountSats);
@@ -344,7 +377,7 @@ contract GatewayUpgradeable is OwnableUpgradeable {
     {
         PeginData storage peginData = peginDataMap[instanceId];
         require(operatorData.peginTxid == peginData.peginTxid, "operator data pegin txid mismatch");
-        require(BitvmPolicy.isValidStakeAmount(peginData.peginAmount, operatorData.stakeAmount), "insufficient stake amount");
+        require(isValidStakeAmount(peginData.peginAmount, operatorData.stakeAmount), "insufficient stake amount");
         operatorDataMap[graphId] = operatorData;
         instanceIdToGraphIds[instanceId].push(graphId);
     }
@@ -412,7 +445,10 @@ contract GatewayUpgradeable is OwnableUpgradeable {
         require(kickoffTxid == operatorData.kickoffTxid, "kickoff txid mismatch");
         (bytes32 blockHash, bytes32 merkleRoot) = MerkleProof.parseBtcBlockHeader(kickoffProof.rawHeader);
         require(bitcoinSPV.blockHash(kickoffProof.height) == blockHash, "invalid header");
-        require(MerkleProof.verifyMerkleProof(merkleRoot, kickoffProof.proof, kickoffTxid, kickoffProof.index), "unable to verify");
+        require(
+            MerkleProof.verifyMerkleProof(merkleRoot, kickoffProof.proof, kickoffTxid, kickoffProof.index),
+            "unable to verify"
+        );
 
         // once kickoff is braodcasted , operator will not be able to cancel withdrawal
         withdrawData.status = WithdrawStatus.Processing;
@@ -439,10 +475,14 @@ contract GatewayUpgradeable is OwnableUpgradeable {
         require(BitvmTxParser.parseTake1Tx(rawTake1Tx) == operatorData.take1Txid, "take1 txid mismatch");
         (bytes32 blockHash, bytes32 merkleRoot) = MerkleProof.parseBtcBlockHeader(take1Proof.rawHeader);
         require(bitcoinSPV.blockHash(take1Proof.height) == blockHash, "invalid header");
-        require(MerkleProof.verifyMerkleProof(merkleRoot, take1Proof.proof, take1Txid, take1Proof.index), "unable to verify");
+        require(
+            MerkleProof.verifyMerkleProof(merkleRoot, take1Proof.proof, take1Txid, take1Proof.index), "unable to verify"
+        );
 
         peginData.status = PeginStatus.Claimed;
         withdrawData.status = WithdrawStatus.Complete;
+
+        // TODO: implement incentive mechanism for honest Operators
 
         emit WithdrawHappyPath(instanceId, graphId, take1Txid);
     }
@@ -462,10 +502,14 @@ contract GatewayUpgradeable is OwnableUpgradeable {
         require(take2Txid == operatorData.take2Txid, "take2 txid mismatch");
         (bytes32 blockHash, bytes32 merkleRoot) = MerkleProof.parseBtcBlockHeader(take2Proof.rawHeader);
         require(bitcoinSPV.blockHash(take2Proof.height) == blockHash, "invalid header");
-        require(MerkleProof.verifyMerkleProof(merkleRoot, take2Proof.proof, take2Txid, take2Proof.index), "unable to verify");
+        require(
+            MerkleProof.verifyMerkleProof(merkleRoot, take2Proof.proof, take2Txid, take2Proof.index), "unable to verify"
+        );
 
         peginData.status = PeginStatus.Claimed;
         withdrawData.status = WithdrawStatus.Complete;
+
+        // TODO: implement incentive mechanism for honest Operators
 
         emit WithdrawUnhappyPath(instanceId, graphId, take2Txid);
     }
@@ -483,7 +527,8 @@ contract GatewayUpgradeable is OwnableUpgradeable {
 
         // verify Disprove tx
         OperatorData storage operatorData = operatorDataMap[graphId];
-        (bytes32 disproveTxid, bytes32 assertFinalTxid) = BitvmTxParser.parseDisproveTx(rawDisproveTx);
+        (bytes32 disproveTxid, bytes32 assertFinalTxid, address disproverAddress) =
+            BitvmTxParser.parseDisproveTx(rawDisproveTx);
         require(assertFinalTxid == operatorData.assertFinalTxid, "Assert-Final txid mismatch");
         (bytes32 blockHash, bytes32 merkleRoot) = MerkleProof.parseBtcBlockHeader(disproveProof.rawHeader);
         require(bitcoinSPV.blockHash(disproveProof.height) == blockHash, "invalid header in disproveProof");
@@ -504,6 +549,9 @@ contract GatewayUpgradeable is OwnableUpgradeable {
             "unable to verify challenge merkle proof"
         );
 
-        emit WithdrawDisproved(instanceId, graphId, disproveTxid, challengeTxid, challengerAddress);
+        // TODO: reward Challenger and Disprover
+        // Committee temporarily holds the Operator's forfeiture, which will be distributed to both Challenger and Disprover as a reward
+
+        emit WithdrawDisproved(instanceId, graphId, disproveTxid, challengeTxid, challengerAddress, disproverAddress);
     }
 }
