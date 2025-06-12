@@ -15,18 +15,18 @@ contract BitvmPolicy is OwnableUpgradeable {
 
     uint64 public minStakeAmountSats;
     uint64 public stakeRate;
-    uint64 public minChallengeAmountSat;
+    uint64 public minChallengeAmountSats;
     uint64 public challengeRate;
 
     function setStakeAndChallengePolicy(
         uint64 _minStakeAmountSats,
         uint64 _stakeRate,
-        uint64 _minChallengeAmountSat,
+        uint64 _minChallengeAmountSats,
         uint64 _challengeRate
     ) public onlyOwner {
         minStakeAmountSats = _minStakeAmountSats;
         stakeRate = _stakeRate;
-        minChallengeAmountSat = _minChallengeAmountSat;
+        minChallengeAmountSats = _minChallengeAmountSats;
         challengeRate = _challengeRate;
     }
 
@@ -35,28 +35,76 @@ contract BitvmPolicy is OwnableUpgradeable {
     }
 
     function isValidChallengeAmount(uint64 peginAmountSats, uint64 challengeAmount) public view returns (bool) {
-        return challengeAmount >= minChallengeAmountSat + peginAmountSats * challengeRate / rateMultiplier;
+        return challengeAmount >= minChallengeAmountSats + peginAmountSats * challengeRate / rateMultiplier;
+    }
+
+    uint64 public minPeginFeeSats;
+    uint64 public peginFeeRate;
+    uint64 public minOperatorRewardSats;
+    uint64 public operatorRewardRate;
+    uint64 public minChallengerRewardSats;
+    uint64 public challengerRewardRate;
+    uint64 public minDisproverRewardSats;
+    uint64 public disproverRewardRate;
+
+    function setFeeAndRewardPolicy(
+        uint64 _minPeginFeeSats,
+        uint64 _peginFeeRate,
+        uint64 _minOperatorRewardSats,
+        uint64 _operatorRewardRate,
+        uint64 _minChallengerRewardSats,
+        uint64 _challengerRewardRate,
+        uint64 _minDisproverRewardSats,
+        uint64 _disproverRewardRate
+    ) public onlyOwner {
+        minPeginFeeSats = _minPeginFeeSats;
+        peginFeeRate = _peginFeeRate;
+        minOperatorRewardSats = _minOperatorRewardSats;
+        operatorRewardRate = _operatorRewardRate;
+        minChallengerRewardSats = _minChallengerRewardSats;
+        challengerRewardRate = _challengerRewardRate;
+        minDisproverRewardSats = _minDisproverRewardSats;
+        disproverRewardRate = _disproverRewardRate;
     }
 }
 
 contract GatewayUpgradeable is BitvmPolicy {
     using EnumerableSet for EnumerableSet.Bytes32Set;
 
-    event BridgeIn(address indexed depositorAddress, bytes16 indexed instanceId, uint64 indexed peginAmountSats);
+    event BridgeIn(
+        address indexed depositorAddress,
+        bytes16 indexed instanceId,
+        uint64 indexed peginAmountSats,
+        uint64 feeAmountSats
+    );
     event InitWithdraw(
         bytes16 indexed instanceId, bytes16 indexed graphId, address indexed operatorAddress, uint64 withdrawAmountSats
     );
     event CancelWithdraw(bytes16 indexed instanceId, bytes16 indexed graphId, address indexed triggerAddress);
     event ProceedWithdraw(bytes16 indexed instanceId, bytes16 indexed graphId, bytes32 kickoffTxid);
-    event WithdrawHappyPath(bytes16 indexed instanceId, bytes16 indexed graphId, bytes32 take1Txid);
-    event WithdrawUnhappyPath(bytes16 indexed instanceId, bytes16 indexed graphId, bytes32 take2Txid);
+    event WithdrawHappyPath(
+        bytes16 indexed instanceId,
+        bytes16 indexed graphId,
+        bytes32 take1Txid,
+        address indexed operatorAddress,
+        uint64 rewardAmountSats
+    );
+    event WithdrawUnhappyPath(
+        bytes16 indexed instanceId,
+        bytes16 indexed graphId,
+        bytes32 take2Txid,
+        address indexed operatorAddress,
+        uint64 rewardAmountSats
+    );
     event WithdrawDisproved(
         bytes16 indexed instanceId,
         bytes16 indexed graphId,
         bytes32 disproveTxid,
         bytes32 challengeTxid,
         address challengerAddress,
-        address disproverAddress
+        address disproverAddress,
+        uint64 challengerRewardAmountSats,
+        uint64 disproverRewardAmountSats
     );
 
     enum PeginStatus {
@@ -131,9 +179,17 @@ contract GatewayUpgradeable is BitvmPolicy {
         __Ownable_init(owner);
 
         minStakeAmountSats = 3000000; // 0.03 BTC
-        stakeRate = 0; // 0%
-        minChallengeAmountSat = 3000000; // 0.03 BTC
-        challengeRate = 0; // 0%
+        // stakeRate = 0; // 0%
+        minChallengeAmountSats = 1000000; // 0.01 BTC
+        // challengeRate = 0; // 0%
+        minPeginFeeSats = 5000; // 0.00005 BTC
+        peginFeeRate = 50; // 0.5%
+        minOperatorRewardSats = 3000; // 0.00003 BTC
+        operatorRewardRate = 30; // 0.3%
+        minChallengerRewardSats = 3000000; // 0.03 BTC
+        // challengerRewardRate = 0; // 0%
+        minDisproverRewardSats = 3000000; // 0.03 BTC
+        // disproverRewardRate = 0; // 0%
 
         relayer = newRelayer;
         relayerPeerId = peerId;
@@ -365,10 +421,13 @@ contract GatewayUpgradeable is BitvmPolicy {
         instanceIds.push(instanceId);
 
         // mint pegBTC to user
-        // TODO: deduct a fee from the User to cover the Operator's peg-out reward
-        pegBTC.mint(depositorAddress, Converter.amountFromSats(peginAmountSats));
+        // deduct a fee from the User to cover the Operator's peg-out reward
+        uint64 feeAmountSats = minPeginFeeSats + peginAmountSats * peginFeeRate / rateMultiplier;
+        require(feeAmountSats < peginAmountSats, "pegin amount cannot cover fee");
+        pegBTC.mint(depositorAddress, Converter.amountFromSats(peginAmountSats - feeAmountSats));
+        pegBTC.mint(address(this), Converter.amountFromSats(feeAmountSats));
 
-        emit BridgeIn(depositorAddress, instanceId, peginAmountSats);
+        emit BridgeIn(depositorAddress, instanceId, peginAmountSats, feeAmountSats);
     }
 
     function postOperatorData(bytes16 instanceId, bytes16 graphId, OperatorData calldata operatorData)
@@ -482,9 +541,11 @@ contract GatewayUpgradeable is BitvmPolicy {
         peginData.status = PeginStatus.Claimed;
         withdrawData.status = WithdrawStatus.Complete;
 
-        // TODO: implement incentive mechanism for honest Operators
+        // incentive mechanism for honest Operators
+        uint64 rewardAmountSats = minOperatorRewardSats + peginData.peginAmount * operatorRewardRate / rateMultiplier;
+        pegBTC.transfer(withdrawData.operatorAddress, Converter.amountFromSats(rewardAmountSats));
 
-        emit WithdrawHappyPath(instanceId, graphId, take1Txid);
+        emit WithdrawHappyPath(instanceId, graphId, take1Txid, withdrawData.operatorAddress, rewardAmountSats);
     }
 
     function finishWithdrawUnhappyPath(
@@ -509,9 +570,11 @@ contract GatewayUpgradeable is BitvmPolicy {
         peginData.status = PeginStatus.Claimed;
         withdrawData.status = WithdrawStatus.Complete;
 
-        // TODO: implement incentive mechanism for honest Operators
+        // incentive mechanism for honest Operators
+        uint64 rewardAmountSats = minOperatorRewardSats + peginData.peginAmount * operatorRewardRate / rateMultiplier;
+        pegBTC.transfer(withdrawData.operatorAddress, Converter.amountFromSats(rewardAmountSats));
 
-        emit WithdrawUnhappyPath(instanceId, graphId, take2Txid);
+        emit WithdrawUnhappyPath(instanceId, graphId, take2Txid, withdrawData.operatorAddress, rewardAmountSats);
     }
 
     function finishWithdrawDisproved(
@@ -549,9 +612,23 @@ contract GatewayUpgradeable is BitvmPolicy {
             "unable to verify challenge merkle proof"
         );
 
-        // TODO: reward Challenger and Disprover
+        // reward Challenger and Disprover
         // Committee temporarily holds the Operator's forfeiture, which will be distributed to both Challenger and Disprover as a reward
+        uint64 peginAmountSats = peginDataMap[instanceId].peginAmount;
+        uint64 challengerRewardAmountSats =
+            minChallengeAmountSats + peginAmountSats * challengerRewardRate / rateMultiplier;
+        uint64 disproverRewardAmountSats =
+            minDisproverRewardSats + peginAmountSats * disproverRewardRate / rateMultiplier;
 
-        emit WithdrawDisproved(instanceId, graphId, disproveTxid, challengeTxid, challengerAddress, disproverAddress);
+        emit WithdrawDisproved(
+            instanceId,
+            graphId,
+            disproveTxid,
+            challengeTxid,
+            challengerAddress,
+            disproverAddress,
+            challengerRewardAmountSats,
+            disproverRewardAmountSats
+        );
     }
 }
