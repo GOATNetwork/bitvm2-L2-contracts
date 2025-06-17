@@ -10,6 +10,24 @@ import {Converter} from "./libraries/Converter.sol";
 import {BitvmTxParser} from "./libraries/BitvmTxParser.sol";
 import {MerkleProof} from "./libraries/MerkleProof.sol";
 
+contract Helper {
+    function parseBtcBlockHeader(bytes calldata rawHeader)
+        public
+        pure
+        returns (bytes32 blockHash, bytes32 merkleRoot)
+    {
+        return MerkleProof.parseBtcBlockHeader(rawHeader);
+    }
+
+    function verifyMerkleProof(bytes32 root, bytes32[] memory proof, bytes32 leaf, uint256 index)
+        public
+        pure
+        returns (bool)
+    {
+        return MerkleProof.verifyMerkleProof(root, proof, leaf, index);
+    }
+}
+
 contract BitvmPolicy is OwnableUpgradeable {
     uint64 constant rateMultiplier = 10000;
 
@@ -68,7 +86,7 @@ contract BitvmPolicy is OwnableUpgradeable {
     }
 }
 
-contract GatewayUpgradeable is BitvmPolicy {
+contract GatewayUpgradeable is BitvmPolicy, Helper {
     using EnumerableSet for EnumerableSet.Bytes32Set;
 
     event BridgeIn(
@@ -178,7 +196,7 @@ contract GatewayUpgradeable is BitvmPolicy {
     function initialize(address owner, address newRelayer, bytes calldata peerId) external initializer {
         __Ownable_init(owner);
 
-        minStakeAmountSats = 3000000; // 0.03 BTC
+        minStakeAmountSats = 2000000; // 0.02 BTC
         // stakeRate = 0; // 0%
         minChallengeAmountSats = 1000000; // 0.01 BTC
         // challengeRate = 0; // 0%
@@ -186,9 +204,9 @@ contract GatewayUpgradeable is BitvmPolicy {
         peginFeeRate = 50; // 0.5%
         minOperatorRewardSats = 3000; // 0.00003 BTC
         operatorRewardRate = 30; // 0.3%
-        minChallengerRewardSats = 3000000; // 0.03 BTC
+        minChallengerRewardSats = 1230000; // 0.0125 BTC
         // challengerRewardRate = 0; // 0%
-        minDisproverRewardSats = 3000000; // 0.03 BTC
+        minDisproverRewardSats = 250000; // 0.0025 BTC
         // disproverRewardRate = 0; // 0%
 
         relayer = newRelayer;

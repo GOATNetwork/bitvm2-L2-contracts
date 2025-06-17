@@ -29,7 +29,7 @@ contract MerkleTest is Test {
         gateway.initialize(admin, relayer, "");
     }
 
-    function test_MerklProof() public view {
+    function test_MerklProof() public pure {
         bytes32 blockHash = 0x30275a78098ef52810890cf21a006b67e5a06fa3671accf7a723f60000000000;
         bytes32 merkleRoot = 0xefd0e339a15d6bc1de81ac9d879e4ea4ea0525c53dadaa8d1b3f12f1bbd5942f;
         bytes memory rawHeader =

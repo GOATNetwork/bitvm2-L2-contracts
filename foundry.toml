@@ -20,11 +20,5 @@ remappings = [
 ]
 
 [rpc_endpoints]
-bscMainnet = "${RPC_URL_BSC_MAINNET}"
-bscTestnet = "${BSC_TESTNET_RPC_URL}"
 goatMainnet = "https://rpc.goat.network"
 goatTestnet = "https://rpc.testnet3.goat.network"
-
-[etherscan]
-bscMainnet = { key = "${BSC_ETHERSCAN_API_KEY}" , url = "https://api.bscscan.com/api"}
-bscTestnet = { key = "${BSC_ETHERSCAN_API_KEY}" }
