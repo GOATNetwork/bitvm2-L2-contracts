@@ -86,9 +86,62 @@ contract BitvmPolicy is OwnableUpgradeable {
     }
 }
 
-contract GatewayUpgradeable is BitvmPolicy, Helper {
+contract NodeRegistry is OwnableUpgradeable {
     using EnumerableSet for EnumerableSet.Bytes32Set;
 
+    address public relayer;
+    bytes public relayerPeerId;
+    EnumerableSet.Bytes32Set private committeePeerId;
+    EnumerableSet.Bytes32Set private operatorPeerId;
+
+    function setRelayer(address newRelayer, bytes calldata peerId) external onlyOwner {
+        require(newRelayer != address(0), "invalid relayer");
+        relayer = newRelayer;
+        relayerPeerId = peerId;
+    }
+
+    function addCommitteePeerId(bytes calldata id) external onlyOwner {
+        require(id.length > 0, "invalid id");
+        bytes32 idHash = keccak256(id);
+        committeePeerId.add(idHash);
+    }
+
+    function removeCommitteePeerId(bytes calldata id) external onlyOwner {
+        bytes32 idHash = keccak256(id);
+        require(committeePeerId.remove(idHash), "not committee");
+    }
+
+    function addOperatorPeerId(bytes calldata id) external onlyOwner {
+        require(id.length > 0, "invalid id");
+        bytes32 idHash = keccak256(id);
+        operatorPeerId.add(idHash);
+    }
+
+    function removeOperatorPeerId(bytes calldata id) external onlyOwner {
+        bytes32 idHash = keccak256(id);
+        require(operatorPeerId.remove(idHash), "not operator");
+    }
+
+    function isCommittee(bytes calldata id) external view returns (bool) {
+        bytes32 idHash = keccak256(id);
+        return committeePeerId.contains(idHash);
+    }
+
+    function getCommitteeLength() external view returns (uint256) {
+        return committeePeerId.length();
+    }
+
+    function isOperator(bytes calldata id) external view returns (bool) {
+        bytes32 idHash = keccak256(id);
+        return operatorPeerId.contains(idHash);
+    }
+
+    function getOperatorLength() external view returns (uint256) {
+        return operatorPeerId.length();
+    }
+}
+
+contract GatewayUpgradeable is BitvmPolicy, NodeRegistry, Helper {
     event BridgeIn(
         address indexed depositorAddress,
         bytes16 indexed instanceId,
@@ -172,12 +225,6 @@ contract GatewayUpgradeable is BitvmPolicy, Helper {
     IPegBTC public immutable pegBTC;
     IBitcoinSPV public immutable bitcoinSPV;
 
-    address public relayer;
-    bytes public relayerPeerId;
-
-    EnumerableSet.Bytes32Set private committeePeerId;
-    EnumerableSet.Bytes32Set private operatorPeerId;
-
     mapping(bytes32 => bool) public peginTxUsed;
     mapping(bytes16 instanceId => PeginData) public peginDataMap;
 
@@ -228,52 +275,6 @@ contract GatewayUpgradeable is BitvmPolicy, Helper {
             msg.sender == relayer || withdrawDataMap[graphId].operatorAddress == msg.sender, "not relayer or operator!"
         );
         _;
-    }
-
-    function setRelayer(address newRelayer, bytes calldata peerId) external onlyOwner {
-        require(newRelayer != address(0), "invalid relayer");
-        relayer = newRelayer;
-        relayerPeerId = peerId;
-    }
-
-    function addCommitteePeerId(bytes calldata id) external onlyOwner {
-        require(id.length > 0, "invalid id");
-        bytes32 idHash = keccak256(id);
-        committeePeerId.add(idHash);
-    }
-
-    function removeCommitteePeerId(bytes calldata id) external onlyOwner {
-        bytes32 idHash = keccak256(id);
-        require(committeePeerId.remove(idHash), "not committee");
-    }
-
-    function addOperatorPeerId(bytes calldata id) external onlyOwner {
-        require(id.length > 0, "invalid id");
-        bytes32 idHash = keccak256(id);
-        operatorPeerId.add(idHash);
-    }
-
-    function removeOperatorPeerId(bytes calldata id) external onlyOwner {
-        bytes32 idHash = keccak256(id);
-        require(operatorPeerId.remove(idHash), "not operator");
-    }
-
-    function isCommittee(bytes calldata id) external view returns (bool) {
-        bytes32 idHash = keccak256(id);
-        return committeePeerId.contains(idHash);
-    }
-
-    function getCommitteeLength() external view returns (uint256) {
-        return committeePeerId.length();
-    }
-
-    function isOperator(bytes calldata id) external view returns (bool) {
-        bytes32 idHash = keccak256(id);
-        return operatorPeerId.contains(idHash);
-    }
-
-    function getOperatorLength() external view returns (uint256) {
-        return operatorPeerId.length();
     }
 
     function getBlockHash(uint256 height) external view returns (bytes32) {
