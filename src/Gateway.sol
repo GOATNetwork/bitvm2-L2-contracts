@@ -638,6 +638,12 @@ contract GatewayUpgradeable is BitvmPolicy, NodeRegistry, Helper {
             minChallengeAmountSats + peginAmountSats * challengerRewardRate / rateMultiplier;
         uint64 disproverRewardAmountSats =
             minDisproverRewardSats + peginAmountSats * disproverRewardRate / rateMultiplier;
+        if (challengerAddress != address(0)) {
+            pegBTC.transfer(challengerAddress, Converter.amountFromSats(challengerRewardAmountSats));
+        }
+        if (disproverAddress != address(0)) {
+            pegBTC.transfer(disproverAddress, Converter.amountFromSats(disproverRewardAmountSats));
+        }
 
         emit WithdrawDisproved(
             instanceId,
