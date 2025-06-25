@@ -635,7 +635,7 @@ contract GatewayUpgradeable is BitvmPolicy, NodeRegistry, Helper {
         // Committee temporarily holds the Operator's forfeiture, which will be distributed to both Challenger and Disprover as a reward
         uint64 peginAmountSats = peginDataMap[instanceId].peginAmount;
         uint64 challengerRewardAmountSats =
-            minChallengeAmountSats + peginAmountSats * challengerRewardRate / rateMultiplier;
+            minChallengerRewardSats + peginAmountSats * challengerRewardRate / rateMultiplier;
         uint64 disproverRewardAmountSats =
             minDisproverRewardSats + peginAmountSats * disproverRewardRate / rateMultiplier;
         if (challengerAddress != address(0)) {
