@@ -453,6 +453,7 @@ contract GatewayUpgradeable is BitvmPolicy, NodeRegistry, Helper {
         public
         onlyRelayer
     {
+        require(operatorDataMap[graphId].peginTxid == 0, "operator data already posted");
         PeginData storage peginData = peginDataMap[instanceId];
         require(operatorData.peginTxid == peginData.peginTxid, "operator data pegin txid mismatch");
         require(isValidStakeAmount(peginData.peginAmount, operatorData.stakeAmount), "insufficient stake amount");
@@ -606,6 +607,7 @@ contract GatewayUpgradeable is BitvmPolicy, NodeRegistry, Helper {
         WithdrawData storage withdrawData = withdrawDataMap[graphId];
         bytes16 instanceId = withdrawData.instanceId;
         // Malicious operator may skip initWithdraw & procceedWithdraw
+        require(withdrawData.status != WithdrawStatus.Disproved, "already disproved");
 
         // verify Disprove tx
         OperatorData storage operatorData = operatorDataMap[graphId];
