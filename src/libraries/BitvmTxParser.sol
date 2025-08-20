@@ -86,19 +86,35 @@ library BitvmTxParser {
         return computeTxid(bitcoinTx);
     }
 
-    function parseAssertTimeoutTx(BitcoinTx memory bitcoinTx) internal pure returns (bytes32 assertTimeoutTxid, address challengerAddress) {
+    function parseAssertTimeoutTx(BitcoinTx memory bitcoinTx)
+        internal
+        pure
+        returns (bytes32 assertTimeoutTxid, address challengerAddress)
+    {
         // TODO
     }
 
-    function parseDisproveTx(BitcoinTx memory bitcoinTx) internal pure returns (bytes32 disproveTxid, bytes32 kickoffTxid, address challengerAddress) {
+    function parseDisproveTx(BitcoinTx memory bitcoinTx)
+        internal
+        pure
+        returns (bytes32 disproveTxid, bytes32 kickoffTxid, address challengerAddress)
+    {
         // TODO
     }
 
-    function parseCommitTimeoutTx(BitcoinTx memory bitcoinTx) internal pure returns (bytes32 commitTimeoutTxid, address challengerAddress) {
+    function parseCommitTimeoutTx(BitcoinTx memory bitcoinTx)
+        internal
+        pure
+        returns (bytes32 commitTimeoutTxid, address challengerAddress)
+    {
         // TODO
     }
 
-    function parseNackTx(BitcoinTx memory bitcoinTx) internal pure returns (bytes32 nackTxid, address challengerAddress) {
+    function parseNackTx(BitcoinTx memory bitcoinTx)
+        internal
+        pure
+        returns (bytes32 nackTxid, address challengerAddress)
+    {
         // TODO
     }
 

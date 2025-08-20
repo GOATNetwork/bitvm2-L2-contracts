@@ -41,13 +41,12 @@ contract GatewayUpgradeable is BitvmPolicy {
         address indexed depositorAddress,
         uint64 peginAmountSats,
         uint64[3] txnFees,
-        bytes userInputs
+        Utxo[] userInputs,
+        bytes32 userXonlyPubkey,
+        string userChangeAddress,
+        string userRefundAddress
     );
-    event CommitteeResponse(
-        bytes16 indexed instanceId,
-        address indexed committeeAddress,
-        bytes32 pubkey
-    );
+    event CommitteeResponse(bytes16 indexed instanceId, address indexed committeeAddress, bytes32 committeeXonlyPubkey);
     event BridgeIn(
         address indexed depositorAddress,
         bytes16 indexed instanceId,
@@ -110,20 +109,28 @@ contract GatewayUpgradeable is BitvmPolicy {
         Disproved
     }
 
+    struct Utxo {
+        bytes32 txid;
+        uint32 vout;
+        uint64 amountSats;
+    }
+
     struct PeginDataInner {
         PeginStatus status;
         bytes16 instanceId;
         address depositorAddress;
         uint64 peginAmountSats;
         uint64[3] txnFees;
-        bytes userInputs;
-        bytes32 peginTxid; 
-        uint256 createdAt; 
-
-        // EnumerableMap 
+        Utxo[] userInputs;
+        bytes32 userXonlyPubkey;
+        string userChangeAddress;
+        string userRefundAddress;
+        bytes32 peginTxid;
+        uint256 createdAt;
+        // EnumerableMap
         address[] committeeAddresses;
         mapping(address value => uint256) committeeAddressPositions;
-        mapping(address => bytes32) committeePubkeys;
+        mapping(address => bytes32) committeeXonlyPubkeys;
     }
 
     struct PeginData {
@@ -132,11 +139,14 @@ contract GatewayUpgradeable is BitvmPolicy {
         address depositorAddress;
         uint64 peginAmountSats;
         uint64[3] txnFees;
-        bytes userInputs;
-        bytes32 peginTxid; 
-        uint256 createdAt; 
-        address[] committeeAddresses; 
-        bytes32[] committeePubkeys; 
+        Utxo[] userInputs;
+        bytes32 userXonlyPubkey;
+        string userChangeAddress;
+        string userRefundAddress;
+        bytes32 peginTxid;
+        uint256 createdAt;
+        address[] committeeAddresses;
+        bytes32[] committeeXonlyPubkeys;
     }
 
     struct WithdrawData {
@@ -145,7 +155,7 @@ contract GatewayUpgradeable is BitvmPolicy {
         address operatorAddress;
         bytes16 instanceId;
         uint256 lockAmount;
-        uint256 btcBlockHeightAtWithdraw; 
+        uint256 btcBlockHeightAtWithdraw;
     }
 
     struct GraphData {
@@ -164,7 +174,7 @@ contract GatewayUpgradeable is BitvmPolicy {
     IPegBTC public pegBTC;
     IBitcoinSPV public bitcoinSPV;
 
-    uint256 public responseWindowBlocks = 200; 
+    uint256 public responseWindowBlocks = 200;
 
     bytes16[] public instanceIds;
     mapping(bytes16 instanceId => bytes16[] graphIds) public instanceIdToGraphIds;
@@ -176,6 +186,7 @@ contract GatewayUpgradeable is BitvmPolicy {
     function getGraphIdsByInstanceId(bytes16 instanceId) external view returns (bytes16[] memory) {
         return instanceIdToGraphIds[instanceId];
     }
+
     function getPeginData(bytes16 instanceId) external view returns (PeginData memory) {
         PeginDataInner storage data = peginDataMap[instanceId];
         return PeginData({
@@ -185,12 +196,16 @@ contract GatewayUpgradeable is BitvmPolicy {
             peginAmountSats: data.peginAmountSats,
             txnFees: data.txnFees,
             userInputs: data.userInputs,
+            userXonlyPubkey: data.userXonlyPubkey,
+            userChangeAddress: data.userChangeAddress,
+            userRefundAddress: data.userRefundAddress,
             peginTxid: data.peginTxid,
             createdAt: data.createdAt,
             committeeAddresses: data.committeeAddresses,
-            committeePubkeys: getCommitteePubkeysUnsafe(instanceId)
+            committeeXonlyPubkeys: getCommitteePubkeysUnsafe(instanceId)
         });
     }
+
     function getGraphData(bytes16 graphId) external view returns (GraphData memory) {
         return graphDataMap[graphId];
     }
@@ -205,7 +220,16 @@ contract GatewayUpgradeable is BitvmPolicy {
         _;
     }
 
-    function postPeginRequest(bytes16 instanceId, uint64 peginAmountSats, uint64[3] calldata txnFees, address receiverAddress, bytes calldata userInputs) payable external {
+    function postPeginRequest(
+        bytes16 instanceId,
+        uint64 peginAmountSats,
+        uint64[3] calldata txnFees,
+        address receiverAddress,
+        Utxo[] calldata userInputs,
+        bytes32 userXonlyPubkey,
+        string calldata userChangeAddress,
+        string calldata userRefundAddress
+    ) external payable {
         PeginDataInner storage peginData = peginDataMap[instanceId];
         require(peginData.status == PeginStatus.None, "instanceId already used");
         // TODO: check peginAmount,feeRate,userInputs
@@ -217,6 +241,9 @@ contract GatewayUpgradeable is BitvmPolicy {
         peginData.peginAmountSats = peginAmountSats;
         peginData.txnFees = txnFees;
         peginData.userInputs = userInputs;
+        peginData.userXonlyPubkey = userXonlyPubkey;
+        peginData.userChangeAddress = userChangeAddress;
+        peginData.userRefundAddress = userRefundAddress;
         peginData.createdAt = block.number;
         instanceIds.push(instanceId);
 
@@ -225,11 +252,14 @@ contract GatewayUpgradeable is BitvmPolicy {
             receiverAddress,
             peginAmountSats,
             txnFees,
-            userInputs
+            userInputs,
+            userXonlyPubkey,
+            userChangeAddress,
+            userRefundAddress
         );
     }
 
-    function answerPeginRequest(bytes16 instanceId, bytes32 pubkey) onlyCommittee() external {
+    function answerPeginRequest(bytes16 instanceId, bytes32 committeeXonlyPubkey) external onlyCommittee {
         PeginDataInner storage peginData = peginDataMap[instanceId];
         require(peginData.status == PeginStatus.Pending, "not a pending pegin request");
         require(peginData.createdAt + responseWindowBlocks >= block.number, "response window expired");
@@ -239,31 +269,31 @@ contract GatewayUpgradeable is BitvmPolicy {
             peginData.committeeAddresses.push(committeeAddress);
             // The value is stored at length-1, but we add 1 to all indexes and use 0 as a sentinel value
             peginData.committeeAddressPositions[committeeAddress] = peginData.committeeAddresses.length;
-            peginData.committeePubkeys[committeeAddress] = pubkey;
+            peginData.committeeXonlyPubkeys[committeeAddress] = committeeXonlyPubkey;
         } else {
-            peginData.committeePubkeys[committeeAddress] = pubkey;
+            peginData.committeeXonlyPubkeys[committeeAddress] = committeeXonlyPubkey;
         }
 
-        emit CommitteeResponse(
-            instanceId,
-            committeeAddress,
-            pubkey
-        );
+        emit CommitteeResponse(instanceId, committeeAddress, committeeXonlyPubkey);
     }
 
-    function getCommitteePubkeys(bytes16 instanceId) public view returns (bytes32[] memory committeePubkeys) {
+    function getCommitteePubkeys(bytes16 instanceId) public view returns (bytes32[] memory committeeXonlyPubkeys) {
         require(peginDataMap[instanceId].createdAt + responseWindowBlocks < block.number, "response window not expired");
-        committeePubkeys = getCommitteePubkeysUnsafe(instanceId);
+        committeeXonlyPubkeys = getCommitteePubkeysUnsafe(instanceId);
         // TODO: check whether the number of committee has reached the threshold
         // TODO: key aggregation?
     }
 
-    function getCommitteePubkeysUnsafe(bytes16 instanceId) public view returns (bytes32[] memory committeePubkeys) {
+    function getCommitteePubkeysUnsafe(bytes16 instanceId)
+        public
+        view
+        returns (bytes32[] memory committeeXonlyPubkeys)
+    {
         PeginDataInner storage peginData = peginDataMap[instanceId];
-        committeePubkeys = new bytes32[](peginData.committeeAddresses.length);
-        for (uint i = 0; i < peginData.committeeAddresses.length; ++i) {
+        committeeXonlyPubkeys = new bytes32[](peginData.committeeAddresses.length);
+        for (uint256 i = 0; i < peginData.committeeAddresses.length; ++i) {
             address committeeAddress = peginData.committeeAddresses[i];
-            committeePubkeys[i] = peginData.committeePubkeys[committeeAddress];
+            committeeXonlyPubkeys[i] = peginData.committeeXonlyPubkeys[committeeAddress];
         }
     }
 
@@ -273,18 +303,21 @@ contract GatewayUpgradeable is BitvmPolicy {
         bytes16 instanceId,
         BitvmTxParser.BitcoinTx calldata rawPeginTx,
         MerkleProof.BitcoinTxProof calldata peginProof,
-        bytes calldata committeeSigs
+        bytes[] calldata committeeSigs
     ) external onlyCommittee {
         PeginDataInner storage peginData = peginDataMap[instanceId];
         require(peginData.status == PeginStatus.Pending, "not a pending pegin request");
-        (bytes32 peginTxid, uint64 peginAmountSats, address depositorAddress, bytes16 parsedInstanceId) = BitvmTxParser.parsePegin(rawPeginTx);
+        (bytes32 peginTxid, uint64 peginAmountSats, address depositorAddress, bytes16 parsedInstanceId) =
+            BitvmTxParser.parsePegin(rawPeginTx);
         require(parsedInstanceId == instanceId, "instanceId mismatch");
         require(peginAmountSats == peginData.peginAmountSats, "pegin amount mismatch");
 
         // validate pegin tx
         (bytes32 blockHash, bytes32 merkleRoot) = MerkleProof.parseBtcBlockHeader(peginProof.rawHeader);
         require(bitcoinSPV.blockHash(peginProof.height) == blockHash, "invalid header");
-        require(MerkleProof.verifyMerkleProof(merkleRoot, peginProof.proof, peginTxid, peginProof.index), "unable to verify");
+        require(
+            MerkleProof.verifyMerkleProof(merkleRoot, peginProof.proof, peginTxid, peginProof.index), "unable to verify"
+        );
         // TODO: check commiitteeSigs
         // TODO: check whether the number of committee has reached the threshold
 
@@ -303,10 +336,10 @@ contract GatewayUpgradeable is BitvmPolicy {
     }
 
     function postGraphData(
-        bytes16 instanceId, 
-        bytes16 graphId, 
+        bytes16 instanceId,
+        bytes16 graphId,
         GraphData calldata graphData,
-        bytes calldata committeeSigs
+        bytes[] calldata committeeSigs
     ) public onlyCommittee {
         require(graphDataMap[graphId].peginTxid == 0, "graph data already posted");
         PeginDataInner storage peginData = peginDataMap[instanceId];
@@ -318,10 +351,7 @@ contract GatewayUpgradeable is BitvmPolicy {
         instanceIdToGraphIds[instanceId].push(graphId);
     }
 
-    function initWithdraw(
-        bytes16 instanceId, 
-        bytes16 graphId
-    ) external {
+    function initWithdraw(bytes16 instanceId, bytes16 graphId) external {
         WithdrawData storage withdrawData = withdrawDataMap[graphId];
         require(
             withdrawData.status == WithdrawStatus.None || withdrawData.status == WithdrawStatus.Canceled,
@@ -363,11 +393,14 @@ contract GatewayUpgradeable is BitvmPolicy {
         bytes16 graphId,
         BitvmTxParser.BitcoinTx calldata rawKickoffTx,
         MerkleProof.BitcoinTxProof calldata kickoffProof
-    ) external onlyCommittee() {
+    ) external onlyCommittee {
         WithdrawData storage withdrawData = withdrawDataMap[graphId];
         bytes16 instanceId = withdrawData.instanceId;
         require(withdrawData.status == WithdrawStatus.Initialized, "invalid withdraw index: not at init stage");
-        require(withdrawData.btcBlockHeightAtWithdraw < kickoffProof.height, "kickoff height must be greater than init-withdraw height");
+        require(
+            withdrawData.btcBlockHeightAtWithdraw < kickoffProof.height,
+            "kickoff height must be greater than init-withdraw height"
+        );
 
         GraphData storage graphData = graphDataMap[graphId];
         bytes32 kickoffTxid = BitvmTxParser.parseKickoffTx(rawKickoffTx);
@@ -392,7 +425,7 @@ contract GatewayUpgradeable is BitvmPolicy {
         bytes16 graphId,
         BitvmTxParser.BitcoinTx calldata rawTake1Tx,
         MerkleProof.BitcoinTxProof calldata take1Proof
-    ) external onlyCommittee() {
+    ) external onlyCommittee {
         WithdrawData storage withdrawData = withdrawDataMap[graphId];
         bytes16 instanceId = withdrawData.instanceId;
         PeginDataInner storage peginData = peginDataMap[instanceId];
@@ -411,7 +444,8 @@ contract GatewayUpgradeable is BitvmPolicy {
         withdrawData.status = WithdrawStatus.Complete;
 
         // incentive mechanism for honest Operators
-        uint64 rewardAmountSats = minOperatorRewardSats + peginData.peginAmountSats * operatorRewardRate / rateMultiplier;
+        uint64 rewardAmountSats =
+            minOperatorRewardSats + peginData.peginAmountSats * operatorRewardRate / rateMultiplier;
         pegBTC.transfer(withdrawData.operatorAddress, Converter.amountFromSats(rewardAmountSats));
 
         emit WithdrawHappyPath(instanceId, graphId, take1Txid, withdrawData.operatorAddress, rewardAmountSats);
@@ -421,7 +455,7 @@ contract GatewayUpgradeable is BitvmPolicy {
         bytes16 graphId,
         BitvmTxParser.BitcoinTx calldata rawTake2Tx,
         MerkleProof.BitcoinTxProof calldata take2Proof
-    ) external onlyCommittee() {
+    ) external onlyCommittee {
         WithdrawData storage withdrawData = withdrawDataMap[graphId];
         bytes16 instanceId = withdrawData.instanceId;
         PeginDataInner storage peginData = peginDataMap[instanceId];
@@ -440,7 +474,8 @@ contract GatewayUpgradeable is BitvmPolicy {
         withdrawData.status = WithdrawStatus.Complete;
 
         // incentive mechanism for honest Operators
-        uint64 rewardAmountSats = minOperatorRewardSats + peginData.peginAmountSats * operatorRewardRate / rateMultiplier;
+        uint64 rewardAmountSats =
+            minOperatorRewardSats + peginData.peginAmountSats * operatorRewardRate / rateMultiplier;
         pegBTC.transfer(withdrawData.operatorAddress, Converter.amountFromSats(rewardAmountSats));
 
         emit WithdrawUnhappyPath(instanceId, graphId, take2Txid, withdrawData.operatorAddress, rewardAmountSats);
@@ -454,7 +489,7 @@ contract GatewayUpgradeable is BitvmPolicy {
         MerkleProof.BitcoinTxProof calldata challengeStartTxProof,
         BitvmTxParser.BitcoinTx calldata rawChallengeFinishTx,
         MerkleProof.BitcoinTxProof calldata challengeFinishTxProof
-    ) external onlyCommittee() {
+    ) external onlyCommittee {
         WithdrawData storage withdrawData = withdrawDataMap[graphId];
         GraphData storage graphData = graphDataMap[graphId];
         bytes16 instanceId = withdrawData.instanceId;
@@ -462,12 +497,17 @@ contract GatewayUpgradeable is BitvmPolicy {
         require(withdrawData.status != WithdrawStatus.Disproved, "already disproved");
 
         // verify ChallengeStart tx
-        (bytes32 challengeStartTxid, bytes32 kickoffTxid, address challengerAddress) = BitvmTxParser.parseChallengeTx(rawChallengeStartTx);
+        (bytes32 challengeStartTxid, bytes32 kickoffTxid, address challengerAddress) =
+            BitvmTxParser.parseChallengeTx(rawChallengeStartTx);
         require(kickoffTxid == graphData.kickoffTxid, "ChallengeStartTx: kickoff txid mismatch");
         (bytes32 blockHash, bytes32 merkleRoot) = MerkleProof.parseBtcBlockHeader(challengeStartTxProof.rawHeader);
-        require(bitcoinSPV.blockHash(challengeStartTxProof.height) == blockHash, "invalid header in challengeStartTxProof");
         require(
-            MerkleProof.verifyMerkleProof(merkleRoot, challengeStartTxProof.proof, challengeStartTxid, challengeStartTxProof.index),
+            bitcoinSPV.blockHash(challengeStartTxProof.height) == blockHash, "invalid header in challengeStartTxProof"
+        );
+        require(
+            MerkleProof.verifyMerkleProof(
+                merkleRoot, challengeStartTxProof.proof, challengeStartTxid, challengeStartTxProof.index
+            ),
             "unable to verify challengeStartTx merkle proof"
         );
 
@@ -476,10 +516,14 @@ contract GatewayUpgradeable is BitvmPolicy {
         address disproverAddress;
         if (disproveTxType == DisproveTxType.AssertTimeout) {
             (challengeFinishTxid, disproverAddress) = BitvmTxParser.parseAssertTimeoutTx(rawChallengeFinishTx);
-            require(challengeFinishTxid == graphData.assertTimoutTxid, "ChallengeFinishTx: assert timeout txid mismatch");
+            require(
+                challengeFinishTxid == graphData.assertTimoutTxid, "ChallengeFinishTx: assert timeout txid mismatch"
+            );
         } else if (disproveTxType == DisproveTxType.OperatorCommitTimeout) {
             (challengeFinishTxid, disproverAddress) = BitvmTxParser.parseCommitTimeoutTx(rawChallengeFinishTx);
-            require(challengeFinishTxid == graphData.commitTimoutTxid, "ChallengeFinishTx: commit timeout txid mismatch");
+            require(
+                challengeFinishTxid == graphData.commitTimoutTxid, "ChallengeFinishTx: commit timeout txid mismatch"
+            );
         } else if (disproveTxType == DisproveTxType.OperatorNack) {
             (challengeFinishTxid, disproverAddress) = BitvmTxParser.parseNackTx(rawChallengeFinishTx);
             require(graphData.NackTxids.length > nackIndex, "Nack tx index out of range");
@@ -487,11 +531,13 @@ contract GatewayUpgradeable is BitvmPolicy {
         } else if (disproveTxType == DisproveTxType.Disprove) {
             (challengeFinishTxid, kickoffTxid, disproverAddress) = BitvmTxParser.parseDisproveTx(rawChallengeFinishTx);
             require(kickoffTxid == graphData.kickoffTxid, "ChallengeFinishTx: kickoffTxid txid mismatch");
-        } 
+        }
         (blockHash, merkleRoot) = MerkleProof.parseBtcBlockHeader(challengeFinishTxProof.rawHeader);
         require(bitcoinSPV.blockHash(challengeFinishTxProof.height) == blockHash, "invalid header in disproveProof");
         require(
-            MerkleProof.verifyMerkleProof(merkleRoot, challengeFinishTxProof.proof, challengeFinishTxid, challengeFinishTxProof.index),
+            MerkleProof.verifyMerkleProof(
+                merkleRoot, challengeFinishTxProof.proof, challengeFinishTxid, challengeFinishTxProof.index
+            ),
             "unable to verify disprove merkle proof"
         );
         withdrawData.status = WithdrawStatus.Disproved;
@@ -514,9 +560,9 @@ contract GatewayUpgradeable is BitvmPolicy {
             instanceId,
             graphId,
             disproveTxType,
-            nackIndex, 
+            nackIndex,
             challengeStartTxid,
-            challengeFinishTxid,  
+            challengeFinishTxid,
             challengerAddress,
             disproverAddress,
             challengerRewardAmountSats,
