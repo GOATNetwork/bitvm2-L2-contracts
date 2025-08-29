@@ -11,6 +11,9 @@ library BitvmTxParser {
         bytes4 locktime;
     }
 
+    uint32 constant CHALLENGE_CONNECTOR_VOUT = 0;
+    uint32 constant DISPROVE_CONNECTOR_VOUT = 3;
+
     function parsePegin(BitcoinTx memory bitcoinTx)
         internal
         pure
@@ -48,7 +51,7 @@ library BitvmTxParser {
     function parseChallengeTx(BitcoinTx memory bitcoinTx)
         internal
         pure
-        returns (bytes32 challengeTxid, bytes32 kickoffTxid, address challengerAddress)
+        returns (bytes32 challengeTxid, bytes32 kickoffTxid, uint32 kickoffVout, address challengerAddress)
     {
         // TODO: Update
         challengeTxid = computeTxid(bitcoinTx);
@@ -76,6 +79,7 @@ library BitvmTxParser {
                 challengerAddress = address(bytes20(memLoad(txouts, opReturnScriptOffset + 2)));
             }
         }
+        // TODO: parse kickoffVout
     }
 
     function parseTake1Tx(BitcoinTx memory bitcoinTx) internal pure returns (bytes32 take1Txid) {
@@ -86,35 +90,23 @@ library BitvmTxParser {
         return computeTxid(bitcoinTx);
     }
 
-    function parseAssertTimeoutTx(BitcoinTx memory bitcoinTx)
-        internal
-        pure
-        returns (bytes32 assertTimeoutTxid, address challengerAddress)
-    {
+    function parseAssertTimeoutTx(BitcoinTx memory bitcoinTx) internal pure returns (bytes32 assertTimeoutTxid) {
         // TODO
     }
 
     function parseDisproveTx(BitcoinTx memory bitcoinTx)
         internal
         pure
-        returns (bytes32 disproveTxid, bytes32 kickoffTxid, address challengerAddress)
+        returns (bytes32 disproveTxid, bytes32 kickoffTxid, uint32 kickoffVout, address challengerAddress)
     {
         // TODO
     }
 
-    function parseCommitTimeoutTx(BitcoinTx memory bitcoinTx)
-        internal
-        pure
-        returns (bytes32 commitTimeoutTxid, address challengerAddress)
-    {
+    function parseCommitTimeoutTx(BitcoinTx memory bitcoinTx) internal pure returns (bytes32 commitTimeoutTxid) {
         // TODO
     }
 
-    function parseNackTx(BitcoinTx memory bitcoinTx)
-        internal
-        pure
-        returns (bytes32 nackTxid, address challengerAddress)
-    {
+    function parseNackTx(BitcoinTx memory bitcoinTx) internal pure returns (bytes32 nackTxid) {
         // TODO
     }
 

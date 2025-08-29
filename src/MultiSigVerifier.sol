@@ -32,11 +32,7 @@ contract MultiSigVerifier {
     /// @dev This is a generic verifier (no nonce binding). For state changes, use updateOwners().
     /// @param messageHash The keccak256 of the message payload (caller decides payload)
     /// @param signatures  Array of 65-byte ECDSA signatures (r||s||v)
-    function verify(bytes32 messageHash, bytes[] memory signatures)
-        public
-        view
-        returns (bool)
-    {
+    function verify(bytes32 messageHash, bytes[] memory signatures) public view returns (bool) {
         uint256 validSignatures = 0;
         address[] memory seen = new address[](signatures.length);
 
@@ -77,9 +73,7 @@ contract MultiSigVerifier {
         bytes32 actionHash = keccak256(abi.encode(newOwners, newRequired, noteHash));
 
         // Domain-separated, nonce-bound message
-        bytes32 typeHash = keccak256(
-            "UPDATE_OWNERS(address contract,uint256 nonce,bytes32 action)"
-        );
+        bytes32 typeHash = keccak256("UPDATE_OWNERS(address contract,uint256 nonce,bytes32 action)");
         bytes32 digest = keccak256(abi.encode(typeHash, address(this), nonce, actionHash));
 
         require(_verifyCurrentOwners(digest, signatures), "Not enough valid owner sigs");
@@ -146,11 +140,7 @@ contract MultiSigVerifier {
     }
 
     /// @dev Verify signatures from CURRENT owners over `digest`. Uses eth-signed message wrapper.
-    function _verifyCurrentOwners(bytes32 digest, bytes[] calldata signatures)
-        internal
-        view
-        returns (bool)
-    {
+    function _verifyCurrentOwners(bytes32 digest, bytes[] calldata signatures) internal view returns (bool) {
         uint256 validSignatures = 0;
         address[] memory seen = new address[](signatures.length);
 
@@ -166,11 +156,7 @@ contract MultiSigVerifier {
     }
 
     /// @notice Check if an address has already signed
-    function _alreadySigned(address[] memory signers, address signer, uint256 count)
-        internal
-        pure
-        returns (bool)
-    {
+    function _alreadySigned(address[] memory signers, address signer, uint256 count) internal pure returns (bool) {
         for (uint256 i = 0; i < count; i++) {
             if (signers[i] == signer) return true;
         }

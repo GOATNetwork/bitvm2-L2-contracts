@@ -19,8 +19,9 @@ contract MultiSigVerifierTest is Test {
     address[] owners;
     address newOwner1 = vm.addr(11);
     address newOwner2 = vm.addr(12);
-    
+
     bytes32 message;
+
     function setUp() public {
         owners = new address[](3);
         owners[0] = alice;
@@ -32,10 +33,9 @@ contract MultiSigVerifierTest is Test {
 
         // Require at least 2 signatures
         verifier = new MultiSigVerifier(owners, 2);
-        
     }
 
-    function testVerifyWithEnoughSignatures() view public {
+    function testVerifyWithEnoughSignatures() public view {
         // Sign message with alice and bob
         (uint8 v1, bytes32 r1, bytes32 s1) = vm.sign(1, message);
         bytes memory sig1 = abi.encodePacked(r1, s1, v1);
@@ -50,7 +50,7 @@ contract MultiSigVerifierTest is Test {
         assertTrue(ok, "Should be valid with 2 signatures");
     }
 
-    function testVerifyFailsWithSingleSignature() view public {
+    function testVerifyFailsWithSingleSignature() public view {
         // Only signed by Alice
         (uint8 v1, bytes32 r1, bytes32 s1) = vm.sign(1, message);
         bytes memory sig1 = abi.encodePacked(r1, s1, v1);
@@ -62,7 +62,7 @@ contract MultiSigVerifierTest is Test {
         assertFalse(ok, "Should fail with only 1 signature");
     }
 
-    function testVerifyRejectsNonOwnerSignature() view public {
+    function testVerifyRejectsNonOwnerSignature() public view {
         // Signed by non-owner
         (uint8 vX, bytes32 rX, bytes32 sX) = vm.sign(99, message);
         bytes memory sigX = abi.encodePacked(rX, sX, vX);
@@ -82,8 +82,8 @@ contract MultiSigVerifierTest is Test {
         uint256 nonce
     ) internal view returns (bytes memory sig) {
         bytes32 actionHash = keccak256(abi.encode(newOwners, newRequired, noteHash));
-        bytes32 typeHash   = keccak256("UPDATE_OWNERS(address contract,uint256 nonce,bytes32 action)");
-        bytes32 digest     = keccak256(abi.encode(typeHash, address(verifier), nonce, actionHash));
+        bytes32 typeHash = keccak256("UPDATE_OWNERS(address contract,uint256 nonce,bytes32 action)");
+        bytes32 digest = keccak256(abi.encode(typeHash, address(verifier), nonce, actionHash));
 
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(privKey, digest);
         sig = abi.encodePacked(r, s, v);
