@@ -138,7 +138,7 @@ contract GatewayUpgradeable is BitvmPolicy {
         bytes16 instanceId;
         address depositorAddress;
         uint64 peginAmountSats;
-        uint64[3] txnFees;
+        uint64[3] txnFees; // [ peginPrepare , peginComfirm  peginCancel ]
         Utxo[] userInputs;
         bytes32 userXonlyPubkey;
         string userChangeAddress;
