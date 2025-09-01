@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
+import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 import {IBitcoinSPV} from "./interfaces/IBitcoinSPV.sol";
 import {IPegBTC} from "./interfaces/IPegBTC.sol";
+import {ICommitteeManagement} from "./interfaces/ICommitteeManagement.sol";
+import {IStakeManagement} from "./interfaces/IStakeManagement.sol";
 import {Converter} from "./libraries/Converter.sol";
 import {BitvmTxParser} from "./libraries/BitvmTxParser.sol";
 import {MerkleProof} from "./libraries/MerkleProof.sol";
@@ -13,29 +16,22 @@ contract BitvmPolicy {
     uint64 constant rateMultiplier = 10000;
 
     uint64 public minStakeAmountSats;
-    uint64 public stakeRate;
     uint64 public minChallengeAmountSats;
-    uint64 public challengeRate;
 
     uint64 public minPeginFeeSats;
     uint64 public peginFeeRate;
     uint64 public minOperatorRewardSats;
     uint64 public operatorRewardRate;
     uint64 public minChallengerRewardSats;
-    uint64 public challengerRewardRate;
     uint64 public minDisproverRewardSats;
-    uint64 public disproverRewardRate;
+    uint64 public minSlashAmountSats;
 
-    function isValidStakeAmount(uint64 peginAmountSats, uint64 stakeAmountSats) public view returns (bool) {
-        return stakeAmountSats >= minStakeAmountSats + peginAmountSats * stakeRate / rateMultiplier;
-    }
-
-    function isValidChallengeAmount(uint64 peginAmountSats, uint64 challengeAmount) public view returns (bool) {
-        return challengeAmount >= minChallengeAmountSats + peginAmountSats * challengeRate / rateMultiplier;
-    }
+    // TODO Initializer & setters
 }
 
 contract GatewayUpgradeable is BitvmPolicy {
+    using ECDSA for bytes32;
+
     event BridgeInRequest(
         bytes16 indexed instanceId,
         address indexed depositorAddress,
@@ -159,7 +155,6 @@ contract GatewayUpgradeable is BitvmPolicy {
     }
 
     struct GraphData {
-        uint64 stakeAmountSats;
         bytes1 operatorPubkeyPrefix;
         bytes32 operatorPubkey;
         bytes32 peginTxid;
@@ -173,6 +168,8 @@ contract GatewayUpgradeable is BitvmPolicy {
 
     IPegBTC public pegBTC;
     IBitcoinSPV public bitcoinSPV;
+    ICommitteeManagement public committeeManagement;
+    IStakeManagement public stakeManagement;
 
     uint256 public responseWindowBlocks = 200;
 
@@ -209,14 +206,67 @@ contract GatewayUpgradeable is BitvmPolicy {
     function getGraphData(bytes16 graphId) external view returns (GraphData memory) {
         return graphDataMap[graphId];
     }
+    // helpers
+
+    function verifyCommitteeSignatures(bytes32 msgHash, bytes[] memory signatures, address[] memory members)
+        public
+        pure
+        returns (bool)
+    {
+        address[] memory signers = new address[](signatures.length);
+        for (uint256 i = 0; i < signatures.length; i++) {
+            address signer = msgHash.recover(signatures[i]);
+            signers[i] = signer;
+        }
+        // require signers contains all members
+        for (uint256 i = 0; i < members.length; i++) {
+            bool found = false;
+            for (uint256 j = 0; j < signers.length; j++) {
+                if (members[i] == signers[j]) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    function getPostPeginDigest(bytes16 instanceId, bytes32 peginTxid) public view returns (bytes32) {
+        bytes32 typeHash = keccak256("POST_PEGIN_DATA(address contract,bytes16 instanceId,bytes32 peginTxid)");
+        return keccak256(abi.encode(typeHash, address(this), instanceId, peginTxid));
+    }
+
+    function getPostGraphDigest(bytes16 instanceId, bytes16 graphId, GraphData calldata graphData)
+        public
+        view
+        returns (bytes32)
+    {
+        bytes32 typeHash =
+            keccak256("POST_GRAPH_DATA(address contract,bytes16 instanceId,bytes16 graphId,bytes32 graphDataHash)");
+        bytes32 graphDataHash = keccak256(abi.encode(graphData));
+        return keccak256(abi.encode(typeHash, address(this), instanceId, graphId, graphDataHash));
+    }
+
+    function getCancelWithdrawDigest(bytes16 graphId) public view returns (bytes32) {
+        bytes32 typeHash = keccak256("CANCEL_WITHDRAW(address contract,bytes16 graphId)");
+        return keccak256(abi.encode(typeHash, address(this), graphId));
+    }
+
+    function getUnlockStakeDigest(address operator, uint256 amount) public view returns (bytes32) {
+        bytes32 typeHash = keccak256("UNLOCK_OPERATOR_STAKE(address contract,address operator,uint256 amount)");
+        return keccak256(abi.encode(typeHash, address(this), operator, amount));
+    }
 
     modifier onlyCommittee() {
-        // TODO: only committee members can call this function
+        require(committeeManagement.isCommitteeMember(msg.sender), "only committee member can call");
         _;
     }
 
     modifier onlyOperator(bytes16 graphId) {
-        // TODO: only operator can call this function
+        require(withdrawDataMap[graphId].operatorAddress == msg.sender, "only operator can call");
         _;
     }
 
@@ -280,8 +330,13 @@ contract GatewayUpgradeable is BitvmPolicy {
     function getCommitteePubkeys(bytes16 instanceId) public view returns (bytes32[] memory committeeXonlyPubkeys) {
         require(peginDataMap[instanceId].createdAt + responseWindowBlocks < block.number, "response window not expired");
         committeeXonlyPubkeys = getCommitteePubkeysUnsafe(instanceId);
-        // TODO: check whether the number of committee has reached the threshold
-        // TODO: key aggregation?
+        require(committeeXonlyPubkeys.length >= committeeManagement.quorumSize(), "not enough committee responses");
+    }
+
+    function getCommitteeAddresses(bytes16 instanceId) public view returns (address[] memory committeeAddresses) {
+        require(peginDataMap[instanceId].createdAt + responseWindowBlocks < block.number, "response window not expired");
+        committeeAddresses = peginDataMap[instanceId].committeeAddresses;
+        require(committeeAddresses.length >= committeeManagement.quorumSize(), "not enough committee responses");
     }
 
     function getCommitteePubkeysUnsafe(bytes16 instanceId)
@@ -318,8 +373,13 @@ contract GatewayUpgradeable is BitvmPolicy {
         require(
             MerkleProof.verifyMerkleProof(merkleRoot, peginProof.proof, peginTxid, peginProof.index), "unable to verify"
         );
-        // TODO: check commiitteeSigs
-        // TODO: check whether the number of committee has reached the threshold
+
+        // validate committeeSigs
+        bytes32 pegin_digest = getPostPeginDigest(instanceId, peginTxid);
+        require(
+            verifyCommitteeSignatures(pegin_digest, committeeSigs, getCommitteeAddresses(instanceId)),
+            "invalid committee signatures"
+        );
 
         // update storage
         peginData.status = PeginStatus.Withdrawbale;
@@ -341,12 +401,25 @@ contract GatewayUpgradeable is BitvmPolicy {
         GraphData calldata graphData,
         bytes[] calldata committeeSigs
     ) public onlyCommittee {
+        // check operator stake
+        // Note:committee should check operator's locked stake before pre-signed any graph txns
+        address operatorStakeAddress = stakeManagement.pubkeyToAddress(graphData.operatorPubkey);
+        require(operatorStakeAddress != address(0), "operator not registered");
+        require(stakeManagement.lockedStakeOf(operatorStakeAddress) >= minStakeAmountSats, "insufficient operator stake");
+
+        // check committeeSigs
+        bytes32 graph_digest = getPostGraphDigest(instanceId, graphId, graphData);
+        require(
+            verifyCommitteeSignatures(graph_digest, committeeSigs, getCommitteeAddresses(instanceId)),
+            "invalid committee signatures"
+        );
+
+        // check graph data
         require(graphDataMap[graphId].peginTxid == 0, "graph data already posted");
         PeginDataInner storage peginData = peginDataMap[instanceId];
         require(graphData.peginTxid == peginData.peginTxid, "graph data pegin txid mismatch");
-        require(isValidStakeAmount(peginData.peginAmountSats, graphData.stakeAmountSats), "insufficient stake amount");
-        // TODO: validate committeeSigs
 
+        // store graph data
         graphDataMap[graphId] = graphData;
         instanceIdToGraphIds[instanceId].push(graphId);
     }
@@ -389,8 +462,14 @@ contract GatewayUpgradeable is BitvmPolicy {
     }
 
     function conmmitteeCancelWithdraw(bytes16 graphId, bytes[] calldata committeeSigs) external onlyCommittee {
-        // TODO: validate committeeSigs
+        // validate committeeSigs
         WithdrawData storage withdrawData = withdrawDataMap[graphId];
+        bytes32 cancel_digest = getCancelWithdrawDigest(graphId);
+        require(
+            verifyCommitteeSignatures(cancel_digest, committeeSigs, getCommitteeAddresses(withdrawData.instanceId)),
+            "invalid committee signatures"
+        );
+        // update storage
         PeginDataInner storage peginData = peginDataMap[withdrawData.instanceId];
         require(withdrawData.status == WithdrawStatus.Initialized, "invalid withdraw index: not at init stage");
         withdrawData.status = WithdrawStatus.Canceled;
@@ -558,13 +637,15 @@ contract GatewayUpgradeable is BitvmPolicy {
         );
         withdrawData.status = WithdrawStatus.Disproved;
 
-        // reward Challenger and Disprover
-        // Committee temporarily holds the Operator's forfeiture, which will be distributed to both Challenger and Disprover as a reward
-        uint64 peginAmountSats = peginDataMap[instanceId].peginAmountSats;
-        uint64 challengerRewardAmountSats =
-            minChallengerRewardSats + peginAmountSats * challengerRewardRate / rateMultiplier;
-        uint64 disproverRewardAmountSats =
-            minDisproverRewardSats + peginAmountSats * disproverRewardRate / rateMultiplier;
+        // slash Operator & reward Challenger and Disprover
+        address operatorStakeAddress = stakeManagement.pubkeyToAddress(graphData.operatorPubkey);
+        uint256 slashAmount = Converter.amountFromSats(minSlashAmountSats);
+        uint256 operatorStake = stakeManagement.stakeOf(operatorStakeAddress);
+        if (operatorStake < slashAmount) slashAmount = operatorStake;
+        stakeManagement.slashStake(operatorStakeAddress, slashAmount);
+
+        uint64 challengerRewardAmountSats = minChallengerRewardSats;
+        uint64 disproverRewardAmountSats = minDisproverRewardSats;
         if (challengerAddress != address(0)) {
             pegBTC.transfer(challengerAddress, Converter.amountFromSats(challengerRewardAmountSats));
         }
@@ -584,5 +665,17 @@ contract GatewayUpgradeable is BitvmPolicy {
             challengerRewardAmountSats,
             disproverRewardAmountSats
         );
+    }
+
+    /*
+        If an operator wants to unlockStake, they must prove to the committee 
+        that they have processed or discarded all graphs (for example, by spending the 
+        prekickoff-connector through another path). Once the committee members have verified 
+        this, they provide their signatures.
+    */
+    function unlockOperatorStake(address operator, uint256 amount, bytes[] calldata committeeSigs) external onlyCommittee() {
+        bytes32 unlock_digest = getUnlockStakeDigest(operator, amount);
+        require(committeeManagement.verifySignatures(unlock_digest, committeeSigs),"invalid committee signatures");
+        stakeManagement.unlockStake(operator, amount);
     }
 }
