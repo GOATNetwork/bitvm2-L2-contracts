@@ -6,6 +6,7 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
 
 import {IBitcoinSPV} from "./interfaces/IBitcoinSPV.sol";
 import {IPegBTC} from "./interfaces/IPegBTC.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ICommitteeManagement} from "./interfaces/ICommitteeManagement.sol";
 import {IStakeManagement} from "./interfaces/IStakeManagement.sol";
 import {Converter} from "./libraries/Converter.sol";
@@ -15,18 +16,19 @@ import {MerkleProof} from "./libraries/MerkleProof.sol";
 contract BitvmPolicy {
     uint64 constant rateMultiplier = 10000;
 
-    uint64 public minStakeAmountSats;
     uint64 public minChallengeAmountSats;
-
     uint64 public minPeginFeeSats;
     uint64 public peginFeeRate;
     uint64 public minOperatorRewardSats;
     uint64 public operatorRewardRate;
-    uint64 public minChallengerRewardSats;
-    uint64 public minDisproverRewardSats;
-    uint64 public minSlashAmountSats;
+
+    uint64 public minStakeAmount;
+    uint64 public minChallengerReward;
+    uint64 public minDisproverReward;
+    uint64 public minSlashAmount;
 
     // TODO Initializer & setters
+    // TODO: stake token?
 }
 
 contract GatewayUpgradeable is BitvmPolicy {
@@ -77,8 +79,8 @@ contract GatewayUpgradeable is BitvmPolicy {
         bytes32 challengeFinishTxid,
         address challengerAddress,
         address disproverAddress,
-        uint64 challengerRewardAmountSats,
-        uint64 disproverRewardAmountSats
+        uint64 challengerRewardAmount,
+        uint64 disproverRewardAmount
     );
 
     enum DisproveTxType {
@@ -405,7 +407,7 @@ contract GatewayUpgradeable is BitvmPolicy {
         // Note:committee should check operator's locked stake before pre-signed any graph txns
         address operatorStakeAddress = stakeManagement.pubkeyToAddress(graphData.operatorPubkey);
         require(operatorStakeAddress != address(0), "operator not registered");
-        require(stakeManagement.lockedStakeOf(operatorStakeAddress) >= minStakeAmountSats, "insufficient operator stake");
+        require(stakeManagement.lockedStakeOf(operatorStakeAddress) >= minStakeAmount, "insufficient operator stake");
 
         // check committeeSigs
         bytes32 graph_digest = getPostGraphDigest(instanceId, graphId, graphData);
@@ -638,19 +640,20 @@ contract GatewayUpgradeable is BitvmPolicy {
         withdrawData.status = WithdrawStatus.Disproved;
 
         // slash Operator & reward Challenger and Disprover
+        IERC20 stakeToken = IERC20(stakeManagement.stakeTokenAddress());
         address operatorStakeAddress = stakeManagement.pubkeyToAddress(graphData.operatorPubkey);
-        uint256 slashAmount = Converter.amountFromSats(minSlashAmountSats);
+        uint256 slashAmount = minSlashAmount;
         uint256 operatorStake = stakeManagement.stakeOf(operatorStakeAddress);
         if (operatorStake < slashAmount) slashAmount = operatorStake;
         stakeManagement.slashStake(operatorStakeAddress, slashAmount);
 
-        uint64 challengerRewardAmountSats = minChallengerRewardSats;
-        uint64 disproverRewardAmountSats = minDisproverRewardSats;
+        uint64 challengerRewardAmount = minChallengerReward;
+        uint64 disproverRewardAmount = minDisproverReward;
         if (challengerAddress != address(0)) {
-            pegBTC.transfer(challengerAddress, Converter.amountFromSats(challengerRewardAmountSats));
+            stakeToken.transfer(challengerAddress, challengerRewardAmount);
         }
         if (disproverAddress != address(0)) {
-            pegBTC.transfer(disproverAddress, Converter.amountFromSats(disproverRewardAmountSats));
+            stakeToken.transfer(disproverAddress, disproverRewardAmount);
         }
 
         emit WithdrawDisproved(
@@ -662,8 +665,8 @@ contract GatewayUpgradeable is BitvmPolicy {
             challengeFinishTxid,
             challengerAddress,
             disproverAddress,
-            challengerRewardAmountSats,
-            disproverRewardAmountSats
+            challengerRewardAmount,
+            disproverRewardAmount
         );
     }
 
@@ -673,9 +676,12 @@ contract GatewayUpgradeable is BitvmPolicy {
         prekickoff-connector through another path). Once the committee members have verified 
         this, they provide their signatures.
     */
-    function unlockOperatorStake(address operator, uint256 amount, bytes[] calldata committeeSigs) external onlyCommittee() {
+    function unlockOperatorStake(address operator, uint256 amount, bytes[] calldata committeeSigs)
+        external
+        onlyCommittee
+    {
         bytes32 unlock_digest = getUnlockStakeDigest(operator, amount);
-        require(committeeManagement.verifySignatures(unlock_digest, committeeSigs),"invalid committee signatures");
+        require(committeeManagement.verifySignatures(unlock_digest, committeeSigs), "invalid committee signatures");
         stakeManagement.unlockStake(operator, amount);
     }
 }

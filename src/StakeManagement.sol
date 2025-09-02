@@ -20,6 +20,10 @@ contract StakeManagement is IStakeManagement {
         gatewayAddress = _gatewayAddress;
     }
 
+    function stakeTokenAddress() external view override returns (address) {
+        return address(stakeToken);
+    }
+
     function stakeOf(address operator) external view override returns (uint256) {
         return stakes[operator];
     }
