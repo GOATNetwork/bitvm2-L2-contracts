@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+/ SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
 import "forge-std/Test.sol";
@@ -21,7 +21,6 @@ contract MultiSigVerifierTest is Test {
     address newOwner2 = vm.addr(12);
 
     bytes32 message;
-
     function setUp() public {
         owners = new address[](3);
         owners[0] = alice;
@@ -78,12 +77,11 @@ contract MultiSigVerifierTest is Test {
         uint256 privKey,
         address[] memory newOwners,
         uint256 newRequired,
-        bytes32 noteHash,
         uint256 nonce
-    ) internal view returns (bytes memory sig) {
-        bytes32 actionHash = keccak256(abi.encode(newOwners, newRequired, noteHash));
-        bytes32 typeHash = keccak256("UPDATE_OWNERS(address contract,uint256 nonce,bytes32 action)");
-        bytes32 digest = keccak256(abi.encode(typeHash, address(verifier), nonce, actionHash));
+    ) internal pure returns (bytes memory sig) {
+        bytes32 digest = keccak256(
+            abi.encode(nonce, newOwners, newRequired)
+        );
 
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(privKey, digest);
         sig = abi.encodePacked(r, s, v);
@@ -95,14 +93,27 @@ contract MultiSigVerifierTest is Test {
         newOwners[0] = newOwner1;
         newOwners[1] = newOwner2;
         uint256 newRequired = 2;
-        bytes32 noteHash = keccak256("rotation-1");
 
         // Sign with alice (privKey=1) and bob (privKey=2)
         bytes[] memory sigs = new bytes[](2);
-        sigs[0] = _signUpdate(1, newOwners, newRequired, noteHash, verifier.nonce());
-        sigs[1] = _signUpdate(2, newOwners, newRequired, noteHash, verifier.nonce());
+        sigs[0] = _signUpdate(
+            1,
+            newOwners,
+            newRequired,
+            verifier.nonce()
+        );
+        sigs[1] = _signUpdate(
+            2,
+            newOwners,
+            newRequired,
+            verifier.nonce()
+        );
 
-        verifier.updateOwners(newOwners, newRequired, noteHash, sigs);
+        verifier.updateOwners(
+            newOwners,
+            newRequired,
+            sigs
+        );
 
         address[] memory ownersOut = verifier.getOwners();
         assertEq(ownersOut.length, 2);
@@ -118,14 +129,22 @@ contract MultiSigVerifierTest is Test {
         newOwners[0] = newOwner1;
         newOwners[1] = newOwner2;
         uint256 newRequired = 2;
-        bytes32 noteHash = keccak256("rotation-2");
 
         // Only Alice signs
         bytes[] memory sigs = new bytes[](1);
-        sigs[0] = _signUpdate(1, newOwners, newRequired, noteHash, verifier.nonce());
+        sigs[0] = _signUpdate(
+            1,
+            newOwners,
+            newRequired,
+            verifier.nonce()
+        );
 
-        vm.expectRevert("Not enough valid owner sigs");
-        verifier.updateOwners(newOwners, newRequired, noteHash, sigs);
+        vm.expectRevert("No enough valid owner sigs");
+        verifier.updateOwners(
+            newOwners,
+            newRequired,
+            sigs
+        );
     }
 
     function testUpdateOwnersFail_ReusedNonce() public {
@@ -133,16 +152,33 @@ contract MultiSigVerifierTest is Test {
         newOwners[0] = newOwner1;
         newOwners[1] = newOwner2;
         uint256 newRequired = 2;
-        bytes32 noteHash = keccak256("rotation-3");
 
         bytes[] memory sigs = new bytes[](2);
-        sigs[0] = _signUpdate(1, newOwners, newRequired, noteHash, verifier.nonce());
-        sigs[1] = _signUpdate(2, newOwners, newRequired, noteHash, verifier.nonce());
+        sigs[0] = _signUpdate(
+            1,
+            newOwners,
+            newRequired,
+            verifier.nonce()
+        );
+        sigs[1] = _signUpdate(
+            2,
+            newOwners,
+            newRequired,
+            verifier.nonce()
+        );
 
-        verifier.updateOwners(newOwners, newRequired, noteHash, sigs);
+        verifier.updateOwners(
+            newOwners,
+            newRequired,
+            sigs
+        );
 
         // Try replay with same signatures and same nonce
-        vm.expectRevert("Not enough valid owner sigs");
-        verifier.updateOwners(newOwners, newRequired, noteHash, sigs);
+        vm.expectRevert("No enough valid owner sigs");
+        verifier.updateOwners(
+            newOwners,
+            newRequired,
+            sigs
+        );
     }
 }
