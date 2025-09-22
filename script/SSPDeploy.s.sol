@@ -7,7 +7,7 @@ import "../src/SequencerSetPublisher.sol";
 contract Deploy is Script {
     function run() external {
         // Load from environment variables or replace inline
-        address initialOwner = vm.envAddress("OWNER");
+        address initialOwner = vm.envAddress("OWNER"); 
 
         address[] memory initPublishers = new address[](5);
         initPublishers[0] = 0xcC1Bd124EA962Dd3e6f10F814FB6C4493CEA6d27;
