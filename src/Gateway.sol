@@ -87,7 +87,9 @@ contract GatewayUpgradeable is BitvmPolicy {
         AssertTimeout,
         OperatorCommitTimeout,
         OperatorNack,
-        Disprove
+        Disprove,
+        QuickChallenge,
+        ChallengeIncompeleteKickoff
     }
     enum PeginStatus {
         None,
@@ -500,7 +502,7 @@ contract GatewayUpgradeable is BitvmPolicy {
         );
 
         GraphData storage graphData = graphDataMap[graphId];
-        bytes32 kickoffTxid = BitvmTxParser.parseKickoffTx(rawKickoffTx);
+        bytes32 kickoffTxid = BitvmTxParser.computeTxid(rawKickoffTx);
         require(kickoffTxid == graphData.kickoffTxid, "kickoff txid mismatch");
         (bytes32 blockHash, bytes32 merkleRoot) = MerkleProof.parseBtcBlockHeader(kickoffProof.rawHeader);
         require(bitcoinSPV.blockHash(kickoffProof.height) == blockHash, "invalid header");
@@ -529,8 +531,8 @@ contract GatewayUpgradeable is BitvmPolicy {
         require(withdrawData.status == WithdrawStatus.Processing, "invalid withdraw index: not at processing stage");
 
         GraphData storage graphData = graphDataMap[graphId];
-        bytes32 take1Txid = BitvmTxParser.parseTake1Tx(rawTake1Tx);
-        require(BitvmTxParser.parseTake1Tx(rawTake1Tx) == graphData.take1Txid, "take1 txid mismatch");
+        bytes32 take1Txid = BitvmTxParser.computeTxid(rawTake1Tx);
+        require(take1Txid == graphData.take1Txid, "take1 txid mismatch");
         (bytes32 blockHash, bytes32 merkleRoot) = MerkleProof.parseBtcBlockHeader(take1Proof.rawHeader);
         require(bitcoinSPV.blockHash(take1Proof.height) == blockHash, "invalid header");
         require(
@@ -559,7 +561,7 @@ contract GatewayUpgradeable is BitvmPolicy {
         require(withdrawData.status == WithdrawStatus.Processing, "invalid withdraw index: not at processing stage");
 
         GraphData storage graphData = graphDataMap[graphId];
-        bytes32 take2Txid = BitvmTxParser.parseTake2Tx(rawTake2Tx);
+        bytes32 take2Txid = BitvmTxParser.computeTxid(rawTake2Tx);
         require(take2Txid == graphData.take2Txid, "take2 txid mismatch");
         (bytes32 blockHash, bytes32 merkleRoot) = MerkleProof.parseBtcBlockHeader(take2Proof.rawHeader);
         require(bitcoinSPV.blockHash(take2Proof.height) == blockHash, "invalid header");
@@ -578,6 +580,7 @@ contract GatewayUpgradeable is BitvmPolicy {
         emit WithdrawUnhappyPath(instanceId, graphId, take2Txid, withdrawData.operatorAddress, rewardAmountSats);
     }
 
+    // if no challengeStartTx happens (for QuickChallenge & ChallengeIncompeleteKickoff), set rawChallengeStartTx.inputVector to empty
     function finishWithdrawDisproved(
         bytes16 graphId,
         DisproveTxType disproveTxType,
@@ -594,38 +597,54 @@ contract GatewayUpgradeable is BitvmPolicy {
         require(withdrawData.status != WithdrawStatus.Disproved, "already disproved");
 
         // verify ChallengeStart tx
-        (bytes32 challengeStartTxid, bytes32 kickoffTxid, uint32 kickoffVout, address challengerAddress) =
-            BitvmTxParser.parseChallengeTx(rawChallengeStartTx);
-        require(kickoffTxid == graphData.kickoffTxid, "ChallengeStartTx: kickoff txid mismatch");
-        require(kickoffVout == BitvmTxParser.CHALLENGE_CONNECTOR_VOUT, "ChallengeStartTx: kickoff vout mismatch");
-        (bytes32 blockHash, bytes32 merkleRoot) = MerkleProof.parseBtcBlockHeader(challengeStartTxProof.rawHeader);
-        require(
-            bitcoinSPV.blockHash(challengeStartTxProof.height) == blockHash, "invalid header in challengeStartTxProof"
-        );
-        require(
-            MerkleProof.verifyMerkleProof(
-                merkleRoot, challengeStartTxProof.proof, challengeStartTxid, challengeStartTxProof.index
-            ),
-            "unable to verify challengeStartTx merkle proof"
-        );
+        bytes32 challengeStartTxid;
+        address challengerAddress;
+        bytes32 kickoffTxid;
+        uint32 kickoffVout;
+        bytes32 blockHash;
+        bytes32 merkleRoot;
+        if (
+            (
+                disproveTxType == DisproveTxType.QuickChallenge
+                    || disproveTxType == DisproveTxType.ChallengeIncompeleteKickoff
+            ) && (rawChallengeStartTx.inputVector.length == 0)
+        ) {
+            // no challenge start tx
+        } else {
+            (challengeStartTxid, kickoffTxid, kickoffVout, challengerAddress) =
+                BitvmTxParser.parseChallengeTx(rawChallengeStartTx);
+            require(kickoffTxid == graphData.kickoffTxid, "ChallengeStartTx: kickoff txid mismatch");
+            require(kickoffVout == BitvmTxParser.CHALLENGE_CONNECTOR_VOUT, "ChallengeStartTx: kickoff vout mismatch");
+            (blockHash, merkleRoot) = MerkleProof.parseBtcBlockHeader(challengeStartTxProof.rawHeader);
+            require(
+                bitcoinSPV.blockHash(challengeStartTxProof.height) == blockHash,
+                "invalid header in challengeStartTxProof"
+            );
+            require(
+                MerkleProof.verifyMerkleProof(
+                    merkleRoot, challengeStartTxProof.proof, challengeStartTxid, challengeStartTxProof.index
+                ),
+                "unable to verify challengeStartTx merkle proof"
+            );
+        }
 
         // verify ChallengeFinish tx
         bytes32 challengeFinishTxid;
         address disproverAddress;
         if (disproveTxType == DisproveTxType.AssertTimeout) {
-            (challengeFinishTxid) = BitvmTxParser.parseAssertTimeoutTx(rawChallengeFinishTx);
+            (challengeFinishTxid) = BitvmTxParser.computeTxid(rawChallengeFinishTx);
             require(graphData.assertTimoutTxids.length > txnIndex, "assert timeout tx index out of range");
             require(
                 challengeFinishTxid == graphData.assertTimoutTxids[txnIndex],
                 "ChallengeFinishTx: assert timeout txid mismatch"
             );
         } else if (disproveTxType == DisproveTxType.OperatorCommitTimeout) {
-            (challengeFinishTxid) = BitvmTxParser.parseCommitTimeoutTx(rawChallengeFinishTx);
+            (challengeFinishTxid) = BitvmTxParser.computeTxid(rawChallengeFinishTx);
             require(
                 challengeFinishTxid == graphData.commitTimoutTxid, "ChallengeFinishTx: commit timeout txid mismatch"
             );
         } else if (disproveTxType == DisproveTxType.OperatorNack) {
-            (challengeFinishTxid) = BitvmTxParser.parseNackTx(rawChallengeFinishTx);
+            (challengeFinishTxid) = BitvmTxParser.computeTxid(rawChallengeFinishTx);
             require(graphData.NackTxids.length > txnIndex, "Nack tx index out of range");
             require(challengeFinishTxid == graphData.NackTxids[txnIndex], "ChallengeFinishTx: nack txid mismatch");
         } else if (disproveTxType == DisproveTxType.Disprove) {
@@ -633,6 +652,18 @@ contract GatewayUpgradeable is BitvmPolicy {
                 BitvmTxParser.parseDisproveTx(rawChallengeFinishTx);
             require(kickoffTxid == graphData.kickoffTxid, "ChallengeFinishTx: kickoffTxid txid mismatch");
             require(kickoffVout == BitvmTxParser.DISPROVE_CONNECTOR_VOUT, "ChallengeFinishTx: kickoffVout mismatch");
+        } else if (disproveTxType == DisproveTxType.QuickChallenge) {
+            (challengeFinishTxid, kickoffTxid, kickoffVout, disproverAddress) =
+                BitvmTxParser.parseQuickChallengeTx(rawChallengeFinishTx);
+            require(kickoffTxid == graphData.kickoffTxid, "ChallengeFinishTx: kickoffTxid txid mismatch");
+            require(kickoffVout == BitvmTxParser.GUARDIAN_CONNECTOR_VOUT, "ChallengeFinishTx: kickoffVout mismatch");
+        } else if (disproveTxType == DisproveTxType.ChallengeIncompeleteKickoff) {
+            (challengeFinishTxid, kickoffTxid, kickoffVout, disproverAddress) =
+                BitvmTxParser.parseChallengeIncompleteKickoffTx(rawChallengeFinishTx);
+            require(kickoffTxid == graphData.kickoffTxid, "ChallengeFinishTx: kickoffTxid txid mismatch");
+            require(kickoffVout == BitvmTxParser.GUARDIAN_CONNECTOR_VOUT, "ChallengeFinishTx: kickoffVout mismatch");
+        } else {
+            revert("unknown disprove tx type");
         }
         (blockHash, merkleRoot) = MerkleProof.parseBtcBlockHeader(challengeFinishTxProof.rawHeader);
         require(bitcoinSPV.blockHash(challengeFinishTxProof.height) == blockHash, "invalid header in disproveProof");

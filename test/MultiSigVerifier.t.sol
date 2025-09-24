@@ -21,6 +21,7 @@ contract MultiSigVerifierTest is Test {
     address newOwner2 = vm.addr(12);
 
     bytes32 message;
+
     function setUp() public {
         owners = new address[](3);
         owners[0] = alice;
@@ -73,15 +74,12 @@ contract MultiSigVerifierTest is Test {
         assertFalse(ok, "Non-owner signature should not be valid");
     }
 
-    function _signUpdate(
-        uint256 privKey,
-        address[] memory newOwners,
-        uint256 newRequired,
-        uint256 nonce
-    ) internal pure returns (bytes memory sig) {
-        bytes32 digest = keccak256(
-            abi.encodePacked(nonce, newOwners, newRequired)
-        );
+    function _signUpdate(uint256 privKey, address[] memory newOwners, uint256 newRequired, uint256 nonce)
+        internal
+        pure
+        returns (bytes memory sig)
+    {
+        bytes32 digest = keccak256(abi.encodePacked(nonce, newOwners, newRequired));
 
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(privKey, digest);
         sig = abi.encodePacked(r, s, v);
@@ -96,24 +94,10 @@ contract MultiSigVerifierTest is Test {
 
         // Sign with alice (privKey=1) and bob (privKey=2)
         bytes[] memory sigs = new bytes[](2);
-        sigs[0] = _signUpdate(
-            1,
-            newOwners,
-            newRequired,
-            verifier.nonce()
-        );
-        sigs[1] = _signUpdate(
-            2,
-            newOwners,
-            newRequired,
-            verifier.nonce()
-        );
+        sigs[0] = _signUpdate(1, newOwners, newRequired, verifier.nonce());
+        sigs[1] = _signUpdate(2, newOwners, newRequired, verifier.nonce());
 
-        verifier.updateOwners(
-            newOwners,
-            newRequired,
-            sigs
-        );
+        verifier.updateOwners(newOwners, newRequired, sigs);
 
         address[] memory ownersOut = verifier.getOwners();
         assertEq(ownersOut.length, 2);
@@ -132,19 +116,10 @@ contract MultiSigVerifierTest is Test {
 
         // Only Alice signs
         bytes[] memory sigs = new bytes[](1);
-        sigs[0] = _signUpdate(
-            1,
-            newOwners,
-            newRequired,
-            verifier.nonce()
-        );
+        sigs[0] = _signUpdate(1, newOwners, newRequired, verifier.nonce());
 
         vm.expectRevert("No enough valid owner sigs");
-        verifier.updateOwners(
-            newOwners,
-            newRequired,
-            sigs
-        );
+        verifier.updateOwners(newOwners, newRequired, sigs);
     }
 
     function testUpdateOwnersFail_ReusedNonce() public {
@@ -154,31 +129,13 @@ contract MultiSigVerifierTest is Test {
         uint256 newRequired = 2;
 
         bytes[] memory sigs = new bytes[](2);
-        sigs[0] = _signUpdate(
-            1,
-            newOwners,
-            newRequired,
-            verifier.nonce()
-        );
-        sigs[1] = _signUpdate(
-            2,
-            newOwners,
-            newRequired,
-            verifier.nonce()
-        );
+        sigs[0] = _signUpdate(1, newOwners, newRequired, verifier.nonce());
+        sigs[1] = _signUpdate(2, newOwners, newRequired, verifier.nonce());
 
-        verifier.updateOwners(
-            newOwners,
-            newRequired,
-            sigs
-        );
+        verifier.updateOwners(newOwners, newRequired, sigs);
 
         // Try replay with same signatures and same nonce
         vm.expectRevert("No enough valid owner sigs");
-        verifier.updateOwners(
-            newOwners,
-            newRequired,
-            sigs
-        );
+        verifier.updateOwners(newOwners, newRequired, sigs);
     }
 }

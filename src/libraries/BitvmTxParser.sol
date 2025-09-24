@@ -13,6 +13,7 @@ library BitvmTxParser {
 
     uint32 constant CHALLENGE_CONNECTOR_VOUT = 0;
     uint32 constant DISPROVE_CONNECTOR_VOUT = 3;
+    uint32 constant GUARDIAN_CONNECTOR_VOUT = 4;
 
     function parsePegin(BitcoinTx memory bitcoinTx)
         internal
@@ -41,10 +42,6 @@ library BitvmTxParser {
         instanceId = bytes16(memLoad(txouts, opReturnScriptOffset + 10));
         depositorAddress = address(bytes20(memLoad(txouts, opReturnScriptOffset + 26)));
         peginAmountSats = reverseUint64(peginAmountSatsRev);
-    }
-
-    function parseKickoffTx(BitcoinTx memory bitcoinTx) internal pure returns (bytes32 kickoffTxid) {
-        return computeTxid(bitcoinTx);
     }
 
     function parseChallengeTx(BitcoinTx memory bitcoinTx)
@@ -83,18 +80,6 @@ library BitvmTxParser {
         }
     }
 
-    function parseTake1Tx(BitcoinTx memory bitcoinTx) internal pure returns (bytes32 take1Txid) {
-        return computeTxid(bitcoinTx);
-    }
-
-    function parseTake2Tx(BitcoinTx memory bitcoinTx) internal pure returns (bytes32 take2Txid) {
-        return computeTxid(bitcoinTx);
-    }
-
-    function parseAssertTimeoutTx(BitcoinTx memory bitcoinTx) internal pure returns (bytes32 assertTimeoutTxid) {
-        return computeTxid(bitcoinTx);
-    }
-
     function parseDisproveTx(BitcoinTx memory bitcoinTx)
         internal
         pure
@@ -123,12 +108,65 @@ library BitvmTxParser {
         }
     }
 
-    function parseCommitTimeoutTx(BitcoinTx memory bitcoinTx) internal pure returns (bytes32 commitTimeoutTxid) {
-        return computeTxid(bitcoinTx);
+    function parseQuickChallengeTx(BitcoinTx memory bitcoinTx)
+        internal
+        pure
+        returns (bytes32 quickChallengeTxid, bytes32 kickoffTxid, uint32 kickoffVout, address challengerAddress)
+    {
+        quickChallengeTxid = computeTxid(bitcoinTx);
+
+        // kickoffTxid is txid of the txin[0]
+        bytes memory txin = bitcoinTx.inputVector;
+        (, uint256 offset) = parseCompactSize(txin, 32);
+        kickoffTxid = memLoad(txin, offset);
+        // kickoffVout is vout of the txin[0]
+        kickoffVout = reverseUint32(uint32(bytes4(memLoad(txin, offset + 32))));
+
+        // challengerAddress is op_return data of txout[0]
+        // if txout[0] is not op_return, return address(0)
+        // Bitvm disprove OP_RETURN script (22-bytes):
+        // OP_RETURN OP_PUSHBYTES20 {challengerAddress(20-bytes)}
+        challengerAddress = address(0);
+        bytes memory txouts = bitcoinTx.outputVector;
+        (, offset) = parseCompactSize(txouts, 32);
+        (uint256 opReturnScriptSize, uint256 opReturnScriptOffset) = parseCompactSize(txouts, offset + 8);
+        bytes2 firstTwoOpcode = bytes2(memLoad(txouts, opReturnScriptOffset));
+        if (opReturnScriptSize == 22 && firstTwoOpcode == 0x6a14) {
+            challengerAddress = address(bytes20(memLoad(txouts, opReturnScriptOffset + 2)));
+        }
     }
 
-    function parseNackTx(BitcoinTx memory bitcoinTx) internal pure returns (bytes32 nackTxid) {
-        return computeTxid(bitcoinTx);
+    function parseChallengeIncompleteKickoffTx(BitcoinTx memory bitcoinTx)
+        internal
+        pure
+        returns (
+            bytes32 challengeIncompleteKickoffTxid,
+            bytes32 kickoffTxid,
+            uint32 kickoffVout,
+            address challengerAddress
+        )
+    {
+        challengeIncompleteKickoffTxid = computeTxid(bitcoinTx);
+
+        // kickoffTxid is txid of the txin[0]
+        bytes memory txin = bitcoinTx.inputVector;
+        (, uint256 offset) = parseCompactSize(txin, 32);
+        kickoffTxid = memLoad(txin, offset);
+        // kickoffVout is vout of the txin[0]
+        kickoffVout = reverseUint32(uint32(bytes4(memLoad(txin, offset + 32))));
+
+        // challengerAddress is op_return data of txout[0]
+        // if txout[0] is not op_return, return address(0)
+        // Bitvm disprove OP_RETURN script (22-bytes):
+        // OP_RETURN OP_PUSHBYTES20 {challengerAddress(20-bytes)}
+        challengerAddress = address(0);
+        bytes memory txouts = bitcoinTx.outputVector;
+        (, offset) = parseCompactSize(txouts, 32);
+        (uint256 opReturnScriptSize, uint256 opReturnScriptOffset) = parseCompactSize(txouts, offset + 8);
+        bytes2 firstTwoOpcode = bytes2(memLoad(txouts, opReturnScriptOffset));
+        if (opReturnScriptSize == 22 && firstTwoOpcode == 0x6a14) {
+            challengerAddress = address(bytes20(memLoad(txouts, opReturnScriptOffset + 2)));
+        }
     }
 
     function computeTxid(BitcoinTx memory bitcoinTx) internal pure returns (bytes32) {
