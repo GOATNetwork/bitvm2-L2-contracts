@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
@@ -28,10 +29,9 @@ contract BitvmPolicy {
     uint64 public minSlashAmount;
 
     // TODO Initializer & setters
-    // TODO: stake token?
 }
 
-contract GatewayUpgradeable is BitvmPolicy {
+contract GatewayUpgradeable is BitvmPolicy, Initializable {
     using ECDSA for bytes32;
 
     event BridgeInRequest(
@@ -183,6 +183,26 @@ contract GatewayUpgradeable is BitvmPolicy {
     mapping(bytes16 instanceId => PeginDataInner) public peginDataMap;
     mapping(bytes16 graphId => GraphData) public graphDataMap;
     mapping(bytes16 graphId => WithdrawData) public withdrawDataMap;
+
+    // initializer
+    function initialize(IPegBTC _pegBTC, IBitcoinSPV _bitcoinSPV, ICommitteeManagement _committeeManagement, IStakeManagement _stakeManagement) external initializer {
+        // set initial parameters
+        minChallengeAmountSats = 1000000; // 0.01 BTC
+        minPeginFeeSats = 5000; // 0.00005 BTC
+        peginFeeRate = 50; // 0.5%
+        minOperatorRewardSats = 3000; // 0.00003 BTC
+        operatorRewardRate = 30; // 0.3%
+        minStakeAmount = 6000000; // 0.06 BTC
+        minChallengerReward = 1250000; // 0.0125 BTC
+        minDisproverReward = 250000; // 0.0025 BTC
+        minSlashAmount = 3000000; // 0.03 BTC
+        responseWindowBlocks = 200;
+
+        pegBTC = _pegBTC;
+        bitcoinSPV = _bitcoinSPV;
+        committeeManagement = _committeeManagement;
+        stakeManagement = _stakeManagement;
+    }
 
     // getters
     function getGraphIdsByInstanceId(bytes16 instanceId) external view returns (bytes16[] memory) {

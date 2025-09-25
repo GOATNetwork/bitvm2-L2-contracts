@@ -11,7 +11,7 @@ gas_reports = ["*"]
 
 solc_version='0.8.28'
 optimizer = true
-optimizer-runs = 200
+optimizer-runs = 100
 via_ir = true
 
 remappings = [
