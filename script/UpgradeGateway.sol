@@ -28,7 +28,7 @@ contract UpgradeGateway is Script {
     }
 
     function upgrade() public {
-        GatewayUpgradeable gatewayImpl = new GatewayUpgradeable(pegBTC, bitcoinSPV);
+        GatewayUpgradeable gatewayImpl = new GatewayUpgradeable();
         ProxyAdmin(proxyAdmin).upgradeAndCall(ITransparentUpgradeableProxy(gateway), address(gatewayImpl), "");
         console.log("new Gateway impl contract address: ", address(gatewayImpl));
     }

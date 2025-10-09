@@ -176,7 +176,9 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable {
     ICommitteeManagement public committeeManagement;
     IStakeManagement public stakeManagement;
 
-    uint256 public responseWindowBlocks = 200;
+    uint256 public responseWindowBlocks = 200; // 200 goat blocks ~ 10 minutes
+
+    uint256 public cancelWithdrawTimelock = 144; // 144 btc blocks ~ 24 hours
 
     bytes16[] public instanceIds;
     mapping(bytes16 instanceId => bytes16[] graphIds) public instanceIdToGraphIds;
@@ -185,7 +187,12 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable {
     mapping(bytes16 graphId => WithdrawData) public withdrawDataMap;
 
     // initializer
-    function initialize(IPegBTC _pegBTC, IBitcoinSPV _bitcoinSPV, ICommitteeManagement _committeeManagement, IStakeManagement _stakeManagement) external initializer {
+    function initialize(
+        IPegBTC _pegBTC,
+        IBitcoinSPV _bitcoinSPV,
+        ICommitteeManagement _committeeManagement,
+        IStakeManagement _stakeManagement
+    ) external initializer {
         // set initial parameters
         minChallengeAmountSats = 1000000; // 0.01 BTC
         minPeginFeeSats = 5000; // 0.00005 BTC
@@ -196,7 +203,8 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable {
         minChallengerReward = 1250000; // 0.0125 BTC
         minDisproverReward = 250000; // 0.0025 BTC
         minSlashAmount = 3000000; // 0.03 BTC
-        responseWindowBlocks = 200;
+        responseWindowBlocks = 200; // 200 goat blocks ~ 10 minutes
+        cancelWithdrawTimelock = 144; // 144 btc blocks ~ 24 hours
 
         pegBTC = _pegBTC;
         bitcoinSPV = _bitcoinSPV;
@@ -483,6 +491,10 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable {
         WithdrawData storage withdrawData = withdrawDataMap[graphId];
         PeginDataInner storage peginData = peginDataMap[withdrawData.instanceId];
         require(withdrawData.status == WithdrawStatus.Initialized, "invalid withdraw index: not at init stage");
+        require(
+            withdrawData.btcBlockHeightAtWithdraw + cancelWithdrawTimelock < bitcoinSPV.latestConfirmedHeight(),
+            "cannot cancel withdraw before timelock"
+        );
         withdrawData.status = WithdrawStatus.Canceled;
         pegBTC.transfer(msg.sender, withdrawData.lockAmount);
         peginData.status = PeginStatus.Withdrawbale;
