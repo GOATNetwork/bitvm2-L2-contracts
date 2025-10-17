@@ -4,8 +4,8 @@ import {Script, console} from "forge-std/Script.sol";
 
 import {IPegBTC} from "../src/interfaces/IPegBTC.sol";
 import {IBitcoinSPV} from "../src/interfaces/IBitcoinSPV.sol";
-import {ICommitteeManagement} from "../src/interfaces/ICommitteeManagement.sol";
-import {IStakeManagement} from "../src/interfaces/IStakeManagement.sol";
+import {CommitteeManagement} from "../src/CommitteeManagement.sol";
+import {StakeManagement} from "../src/StakeManagement.sol";
 
 import {GatewayUpgradeable} from "../src/Gateway.sol";
 import {PegBTC} from "../src/PegBTC.sol";
@@ -49,8 +49,8 @@ contract DeployGateway is Script {
         gateway.initialize(
             IPegBTC(address(pegBTC)),
             IBitcoinSPV(bitcoinSPV),
-            ICommitteeManagement(address(committeeManagement)),
-            IStakeManagement(address(stakeManagement))
+            CommitteeManagement(address(committeeManagement)),
+            StakeManagement(address(stakeManagement))
         );
     }
 }

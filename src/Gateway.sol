@@ -3,13 +3,12 @@ pragma solidity ^0.8.28;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 import {IBitcoinSPV} from "./interfaces/IBitcoinSPV.sol";
 import {IPegBTC} from "./interfaces/IPegBTC.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {ICommitteeManagement} from "./interfaces/ICommitteeManagement.sol";
-import {IStakeManagement} from "./interfaces/IStakeManagement.sol";
+import {CommitteeManagement} from "./CommitteeManagement.sol";
+import {StakeManagement} from "./StakeManagement.sol";
 import {Converter} from "./libraries/Converter.sol";
 import {BitvmTxParser} from "./libraries/BitvmTxParser.sol";
 import {MerkleProof} from "./libraries/MerkleProof.sol";
@@ -173,8 +172,8 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable {
 
     IPegBTC public pegBTC;
     IBitcoinSPV public bitcoinSPV;
-    ICommitteeManagement public committeeManagement;
-    IStakeManagement public stakeManagement;
+    CommitteeManagement public committeeManagement;
+    StakeManagement public stakeManagement;
 
     uint256 public responseWindowBlocks = 200; // 200 goat blocks ~ 10 minutes
 
@@ -190,8 +189,8 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable {
     function initialize(
         IPegBTC _pegBTC,
         IBitcoinSPV _bitcoinSPV,
-        ICommitteeManagement _committeeManagement,
-        IStakeManagement _stakeManagement
+        CommitteeManagement _committeeManagement,
+        StakeManagement _stakeManagement
     ) external initializer {
         // set initial parameters
         minChallengeAmountSats = 1000000; // 0.01 BTC
@@ -283,14 +282,28 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable {
         return keccak256(abi.encode(typeHash, address(this), instanceId, graphId, graphDataHash));
     }
 
-    function getCancelWithdrawDigest(bytes16 graphId) public view returns (bytes32) {
+    function getCancelWithdrawDigest(bytes16 graphId) internal view returns (bytes32) {
         bytes32 typeHash = keccak256("CANCEL_WITHDRAW(address contract,bytes16 graphId)");
         return keccak256(abi.encode(typeHash, address(this), graphId));
     }
 
-    function getUnlockStakeDigest(address operator, uint256 amount) public view returns (bytes32) {
+    function getCancelWithdrawDigestNonced(bytes16 graphId, uint256 nonce) public view returns (bytes32) {
+        bytes32 msgHash = getCancelWithdrawDigest(graphId);
+        return committeeManagement.getNoncedDigest(msgHash, nonce);
+    }
+
+    function getUnlockStakeDigest(address operator, uint256 amount) internal view returns (bytes32) {
         bytes32 typeHash = keccak256("UNLOCK_OPERATOR_STAKE(address contract,address operator,uint256 amount)");
         return keccak256(abi.encode(typeHash, address(this), operator, amount));
+    }
+
+    function getUnlockStakeDigestNonced(address operator, uint256 amount, uint256 nonce)
+        public
+        view
+        returns (bytes32)
+    {
+        bytes32 msgHash = getUnlockStakeDigest(operator, amount);
+        return committeeManagement.getNoncedDigest(msgHash, nonce);
     }
 
     modifier onlyCommittee() {
@@ -502,14 +515,11 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable {
         emit CancelWithdraw(withdrawData.instanceId, graphId, msg.sender);
     }
 
-    function conmmitteeCancelWithdraw(bytes16 graphId, bytes[] calldata committeeSigs) external onlyCommittee {
+    function committeeCancelWithdraw(bytes16 graphId, uint256 nonce, bytes[] calldata committeeSigs) external {
         // validate committeeSigs
         WithdrawData storage withdrawData = withdrawDataMap[graphId];
         bytes32 cancel_digest = getCancelWithdrawDigest(graphId);
-        require(
-            verifyCommitteeSignatures(cancel_digest, committeeSigs, getCommitteeAddresses(withdrawData.instanceId)),
-            "invalid committee signatures"
-        );
+        committeeManagement.executeNoncedSignatures(cancel_digest, nonce, committeeSigs);
         // update storage
         PeginDataInner storage peginData = peginDataMap[withdrawData.instanceId];
         require(withdrawData.status == WithdrawStatus.Initialized, "invalid withdraw index: not at init stage");
@@ -744,12 +754,11 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable {
         prekickoff-connector through another path). Once the committee members have verified 
         this, they provide their signatures.
     */
-    function unlockOperatorStake(address operator, uint256 amount, bytes[] calldata committeeSigs)
+    function unlockOperatorStake(address operator, uint256 amount, uint256 nonce, bytes[] calldata committeeSigs)
         external
-        onlyCommittee
     {
-        bytes32 unlock_digest = getUnlockStakeDigest(operator, amount);
-        require(committeeManagement.verifySignatures(unlock_digest, committeeSigs), "invalid committee signatures");
+        bytes32 msgHash = getUnlockStakeDigest(operator, amount);
+        committeeManagement.executeNoncedSignatures(msgHash, nonce, committeeSigs);
         stakeManagement.unlockStake(operator, amount);
     }
 }
