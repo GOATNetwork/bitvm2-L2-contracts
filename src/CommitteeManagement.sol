@@ -15,12 +15,13 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
 contract CommitteeManagement is MultiSigVerifier {
     using EnumerableMap for EnumerableMap.AddressToBytes32Map;
     using EnumerableSet for EnumerableSet.AddressSet;
+    using EnumerableSet for EnumerableSet.Bytes32Set;
 
     // ========== Storage ==========
     // Mapping of committee member -> peerId
     EnumerableMap.AddressToBytes32Map private committeePeerId;
     // Set of registered watchtowers
-    EnumerableSet.AddressSet private watchtowerList;
+    EnumerableSet.Bytes32Set private watchtowerList;
     // Whitelist of contracts allowed to externally consume committee-signed authorizations
     EnumerableSet.AddressSet private authorizedCallers;
 
@@ -85,6 +86,11 @@ contract CommitteeManagement is MultiSigVerifier {
         return false;
     }
 
+    /// @notice Returns the list of registered watchtowers
+    function getWatchtowers() external view returns (bytes32[] memory) {
+        return watchtowerList.values();
+    }
+
     // ========== Modifiers ==========
     /// @dev Restricts external execution of nonced signatures to whitelisted callers.
     modifier onlyAuthorizedCaller() {
@@ -118,14 +124,14 @@ contract CommitteeManagement is MultiSigVerifier {
 
     // ========== Watchtower Management ==========
     /// @notice Add a watchtower address via committee authorization
-    function addWatchtower(address watchtower, uint256 nonce, bytes[] memory authSignatures) external {
+    function addWatchtower(bytes32 watchtower, uint256 nonce, bytes[] memory authSignatures) external {
         bytes32 msgHash = getAddWatchtowerDigest(watchtower);
         _executeNoncedSignatures(msgHash, nonce, authSignatures);
         watchtowerList.add(watchtower);
     }
 
     /// @notice Remove a watchtower address via committee authorization
-    function removeWatchtower(address watchtower, uint256 nonce, bytes[] memory authSignatures) external {
+    function removeWatchtower(bytes32 watchtower, uint256 nonce, bytes[] memory authSignatures) external {
         bytes32 msgHash = getRemoveWatchtowerDigest(watchtower);
         _executeNoncedSignatures(msgHash, nonce, authSignatures);
         watchtowerList.remove(watchtower);
@@ -133,25 +139,25 @@ contract CommitteeManagement is MultiSigVerifier {
 
     // ========== Digest Helpers (Watchtower) ==========
     /// @dev Returns the domain-bound message hash for adding a watchtower (without nonce)
-    function getAddWatchtowerDigest(address watchtower) internal view returns (bytes32) {
-        bytes32 typeHash = keccak256("ADD_WATCHTOWER(address watchtower)");
+    function getAddWatchtowerDigest(bytes32 watchtower) internal view returns (bytes32) {
+        bytes32 typeHash = keccak256("ADD_WATCHTOWER(bytes32 watchtower)");
         return keccak256(abi.encode(typeHash, address(this), watchtower));
     }
 
     /// @notice Returns the fully nonced digest for adding a watchtower
-    function getAddWatchtowerDigestNonced(address watchtower, uint256 nonce) public view returns (bytes32) {
+    function getAddWatchtowerDigestNonced(bytes32 watchtower, uint256 nonce) public view returns (bytes32) {
         bytes32 msgHash = getAddWatchtowerDigest(watchtower);
         return getNoncedDigest(msgHash, nonce);
     }
 
     /// @dev Returns the domain-bound message hash for removing a watchtower (without nonce)
-    function getRemoveWatchtowerDigest(address watchtower) internal view returns (bytes32) {
-        bytes32 typeHash = keccak256("REMOVE_WATCHTOWER(address watchtower)");
+    function getRemoveWatchtowerDigest(bytes32 watchtower) internal view returns (bytes32) {
+        bytes32 typeHash = keccak256("REMOVE_WATCHTOWER(bytes32 watchtower)");
         return keccak256(abi.encode(typeHash, address(this), watchtower));
     }
 
     /// @notice Returns the fully nonced digest for removing a watchtower
-    function getRemoveWatchtowerDigestNonced(address watchtower, uint256 nonce) public view returns (bytes32) {
+    function getRemoveWatchtowerDigestNonced(bytes32 watchtower, uint256 nonce) public view returns (bytes32) {
         bytes32 msgHash = getRemoveWatchtowerDigest(watchtower);
         return getNoncedDigest(msgHash, nonce);
     }
