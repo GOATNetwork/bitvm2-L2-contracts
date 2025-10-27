@@ -1,7 +1,7 @@
 pragma solidity ^0.8.0;
 
 import {Script, console} from "forge-std/Script.sol";
-import {GatewayUpgradeable} from "../src/Gateway.sol";
+import {GatewayDebug} from "../src/GatewayDebug.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
@@ -24,7 +24,7 @@ contract UpgradeGateway is Script {
     }
 
     function upgrade() public {
-        GatewayUpgradeable gatewayImpl = new GatewayUpgradeable();
+        GatewayDebug gatewayImpl = new GatewayDebug();
         ProxyAdmin(proxyAdmin).upgradeAndCall(ITransparentUpgradeableProxy(gateway), address(gatewayImpl), "");
         console.log("new Gateway impl contract address: ", address(gatewayImpl));
     }
