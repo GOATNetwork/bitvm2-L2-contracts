@@ -3,7 +3,7 @@ pragma solidity ^0.8.28;
 
 import {GatewayUpgradeable} from "./Gateway.sol";
 import {CommitteeManagement} from "./CommitteeManagement.sol";
-import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
+import {StakeManagement} from "./StakeManagement.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 contract GatewayDebug is GatewayUpgradeable {
@@ -15,10 +15,17 @@ contract GatewayDebug is GatewayUpgradeable {
     function debugMintPegBTC(address to, uint256 amount) external onlyCommittee {
         pegBTC.mint(to, amount);
     }
+
+    function debugUpdateCommitteeManagement(address newCommitteeManagement) external onlyCommittee {
+        committeeManagement = CommitteeManagement(newCommitteeManagement);
+    }
+
+    function debugUpdateStakeManagement(address newStakeManagement) external onlyCommittee {
+        stakeManagement = StakeManagement(newStakeManagement);
+    }
 }
 
 contract CommitteeManagementDebug is CommitteeManagement {
-    using EnumerableMap for EnumerableMap.AddressToBytes32Map;
     using EnumerableSet for EnumerableSet.AddressSet;
     using EnumerableSet for EnumerableSet.Bytes32Set;
 
@@ -54,8 +61,23 @@ contract CommitteeManagementDebug is CommitteeManagement {
         authorizedCallers.remove(caller);
     }
 
-    function debugRegisterPeerId(address member, bytes32 peerId) external onlyCommittee {
+    function debugRegisterPeerId(address member, bytes calldata peerId) external onlyCommittee {
         require(isOwner[member], "Not a committee member");
-        committeePeerId.set(member, peerId);
+
+        // Clear previous index if existed
+        bytes memory prev = committeePeerId[member];
+        if (prev.length != 0) {
+            bytes32 prevHash = keccak256(prev);
+            if (peerIdOwnerByHash[prevHash] == member) {
+                delete peerIdOwnerByHash[prevHash];
+            }
+        }
+
+        bytes32 h = keccak256(peerId);
+        address current = peerIdOwnerByHash[h];
+        require(current == address(0) || current == member, "peerId already registered by another member");
+
+        committeePeerId[member] = peerId;
+        peerIdOwnerByHash[h] = member;
     }
 }

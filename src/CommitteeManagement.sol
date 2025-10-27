@@ -2,7 +2,6 @@
 pragma solidity ^0.8.28;
 
 import {MultiSigVerifier} from "./MultiSigVerifier.sol";
-import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 /// @title CommitteeManagement
@@ -13,13 +12,14 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
 ///      to this contract address and are protected by a per-message nonce scheme stored off-chain
 ///      in the signed payload and on-chain by the `executed` mapping.
 contract CommitteeManagement is MultiSigVerifier {
-    using EnumerableMap for EnumerableMap.AddressToBytes32Map;
     using EnumerableSet for EnumerableSet.AddressSet;
     using EnumerableSet for EnumerableSet.Bytes32Set;
 
     // ========== Storage ==========
-    // Mapping of committee member -> peerId
-    EnumerableMap.AddressToBytes32Map committeePeerId;
+    // Mapping of committee member -> raw peerId bytes
+    mapping(address => bytes) internal committeePeerId;
+    // Hash index: keccak256(peerId) -> member (0 if unused)
+    mapping(bytes32 => address) internal peerIdOwnerByHash;
     // Set of registered watchtowers
     EnumerableSet.Bytes32Set watchtowerList;
     // Whitelist of contracts allowed to externally consume committee-signed authorizations
@@ -70,32 +70,47 @@ contract CommitteeManagement is MultiSigVerifier {
         return verify(msgHash, signatures);
     }
 
+    /// @notice Emitted when a member updates their PeerId
+    event PeerIdUpdated(address indexed member, bytes peerId);
+
     /// @notice Register/update the caller's PeerId for P2P usage
-    function registerPeerId(bytes32 peerId) external {
+    function registerPeerId(bytes calldata peerId) external {
         require(isOwner[msg.sender], "Not a committee member");
-        committeePeerId.set(msg.sender, peerId);
+
+        // Clear previous index if existed
+        bytes memory prev = committeePeerId[msg.sender];
+        if (prev.length != 0) {
+            bytes32 prevHash = keccak256(prev);
+            // Only clear if still pointing to this member
+            if (peerIdOwnerByHash[prevHash] == msg.sender) {
+                delete peerIdOwnerByHash[prevHash];
+            }
+        }
+
+        // Enforce uniqueness of peerId across members (by hash)
+        bytes32 h = keccak256(peerId);
+        address current = peerIdOwnerByHash[h];
+        require(current == address(0) || current == msg.sender, "peerId already registered by another member");
+
+        committeePeerId[msg.sender] = peerId;
+        peerIdOwnerByHash[h] = msg.sender;
+
+        emit PeerIdUpdated(msg.sender, peerId);
     }
 
     /// @notice Get the stored PeerId of a committee member
-    function getCommitteePeerId(address member) external view returns (bytes32) {
+    function getCommitteePeerId(address member) external view returns (bytes memory) {
         require(isOwner[member], "Not a committee member");
-        require(committeePeerId.contains(member), "Member has no registered PeerId");
-        return committeePeerId.get(member);
+        bytes memory id = committeePeerId[member];
+        require(id.length != 0, "Member has no registered PeerId");
+        return id;
     }
 
     /// @notice Checks whether a peerId is currently associated with any active committee member
-    function isValidPeerId(bytes32 peerId) external view returns (bool) {
-        for (uint256 i = 0; i < committeePeerId.length(); i++) {
-            (address member, bytes32 storedPeerId) = committeePeerId.at(i);
-            if (storedPeerId == peerId) {
-                if (isOwner[member]) {
-                    return true;
-                } else {
-                    return false;
-                }
-            }
-        }
-        return false;
+    function isValidPeerId(bytes calldata peerId) external view returns (bool) {
+        address member = peerIdOwnerByHash[keccak256(peerId)];
+        if (member == address(0)) return false;
+        return isOwner[member];
     }
 
     /// @notice Returns the list of registered watchtowers
