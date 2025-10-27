@@ -7,11 +7,9 @@ import {IBitcoinSPV} from "../src/interfaces/IBitcoinSPV.sol";
 import {CommitteeManagement} from "../src/CommitteeManagement.sol";
 import {StakeManagement} from "../src/StakeManagement.sol";
 
-import {GatewayUpgradeable} from "../src/Gateway.sol";
+import {GatewayDebug, CommitteeManagementDebug} from "../src/GatewayDebug.sol";
 import {PegBTC} from "../src/PegBTC.sol";
 import {UpgradeableProxy} from "../src/UpgradeableProxy.sol";
-import {CommitteeManagement} from "../src/CommitteeManagement.sol";
-import {StakeManagement} from "../src/StakeManagement.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract DeployGateway is Script {
@@ -33,12 +31,12 @@ contract DeployGateway is Script {
 
     function deploy() public {
         // deploy contracts
-        GatewayUpgradeable gatewayImpl = new GatewayUpgradeable();
+        GatewayDebug gatewayImpl = new GatewayDebug();
         console.log("Gateway implementation contract address: ", address(gatewayImpl));
 
         UpgradeableProxy proxy = new UpgradeableProxy(address(gatewayImpl), deployer, "");
         console.log("Gateway proxy contract contract address: ", address(proxy));
-        GatewayUpgradeable gateway = GatewayUpgradeable(payable(proxy));
+        GatewayDebug gateway = GatewayDebug(payable(proxy));
 
         PegBTC pegBTC = new PegBTC(address(gateway));
         console.log("PegBTC contract address: ", address(pegBTC));
@@ -51,8 +49,8 @@ contract DeployGateway is Script {
         bytes32[] memory initialWatchtowers = _readSequentialBytes32("WATCHTOWER");
         address[] memory initialAuthorizedCallers = new address[](1);
         initialAuthorizedCallers[0] = address(gateway);
-        CommitteeManagement committeeManagement =
-            new CommitteeManagement(initialMembers, initialRequired, initialAuthorizedCallers, initialWatchtowers);
+        CommitteeManagementDebug committeeManagement =
+            new CommitteeManagementDebug(initialMembers, initialRequired, initialAuthorizedCallers, initialWatchtowers);
         console.log("CommitteeManagement contract address: ", address(committeeManagement));
 
         StakeManagement stakeManagement = new StakeManagement(IERC20(address(pegBTC)), address(gateway));

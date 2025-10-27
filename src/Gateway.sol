@@ -68,8 +68,7 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable {
         keccak256("POST_PEGIN_DATA(address contract,bytes16 instanceId,bytes32 peginTxid)");
     bytes32 private constant POST_GRAPH_TYPEHASH =
         keccak256("POST_GRAPH_DATA(address contract,bytes16 instanceId,bytes16 graphId,bytes32 graphDataHash)");
-    bytes32 private constant CANCEL_WITHDRAW_TYPEHASH =
-        keccak256("CANCEL_WITHDRAW(address contract,bytes16 graphId)");
+    bytes32 private constant CANCEL_WITHDRAW_TYPEHASH = keccak256("CANCEL_WITHDRAW(address contract,bytes16 graphId)");
     bytes32 private constant UNLOCK_STAKE_TYPEHASH =
         keccak256("UNLOCK_OPERATOR_STAKE(address contract,address operator,uint256 amount)");
 
@@ -362,7 +361,7 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable {
         string calldata userRefundAddress
     ) external payable {
         PeginDataInner storage peginData = peginDataMap[instanceId];
-    if (peginData.status != PeginStatus.None) revert InstanceUsed();
+        if (peginData.status != PeginStatus.None) revert InstanceUsed();
         // TODO: check peginAmount,feeRate,userInputs
         // TODO: charge fee
 
@@ -392,11 +391,11 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable {
 
     function answerPeginRequest(bytes16 instanceId, bytes memory committeePubkey) external onlyCommittee {
         PeginDataInner storage peginData = peginDataMap[instanceId];
-    if (peginData.status != PeginStatus.Pending) revert NotPending();
-    if (peginData.createdAt + responseWindowBlocks < block.number) revert WindowExpired();
-    if (committeePubkey.length != 33) revert InvalidPubkeyLen();
+        if (peginData.status != PeginStatus.Pending) revert NotPending();
+        if (peginData.createdAt + responseWindowBlocks < block.number) revert WindowExpired();
+        if (committeePubkey.length != 33) revert InvalidPubkeyLen();
         bytes1 committeePubkeyParity = committeePubkey[0];
-    if (!(committeePubkeyParity == 0x02 || committeePubkeyParity == 0x03)) revert InvalidPubkeyParity();
+        if (!(committeePubkeyParity == 0x02 || committeePubkeyParity == 0x03)) revert InvalidPubkeyParity();
         bytes32 committeeXonlyPubkey;
         assembly {
             committeeXonlyPubkey := mload(add(committeePubkey, 0x21))
@@ -415,15 +414,15 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable {
     }
 
     function getCommitteePubkeys(bytes16 instanceId) public view returns (bytes[] memory committeePubkeys) {
-    if (peginDataMap[instanceId].createdAt + responseWindowBlocks >= block.number) revert WindowNotExpired();
+        if (peginDataMap[instanceId].createdAt + responseWindowBlocks >= block.number) revert WindowNotExpired();
         committeePubkeys = getCommitteePubkeysUnsafe(instanceId);
-    if (committeePubkeys.length < committeeManagement.quorumSize()) revert NotEnoughCommittee();
+        if (committeePubkeys.length < committeeManagement.quorumSize()) revert NotEnoughCommittee();
     }
 
     function getCommitteeAddresses(bytes16 instanceId) public view returns (address[] memory committeeAddresses) {
-    if (peginDataMap[instanceId].createdAt + responseWindowBlocks >= block.number) revert WindowNotExpired();
+        if (peginDataMap[instanceId].createdAt + responseWindowBlocks >= block.number) revert WindowNotExpired();
         committeeAddresses = peginDataMap[instanceId].committeeAddresses;
-    if (committeeAddresses.length < committeeManagement.quorumSize()) revert NotEnoughCommittee();
+        if (committeeAddresses.length < committeeManagement.quorumSize()) revert NotEnoughCommittee();
     }
 
     function getCommitteePubkeysUnsafe(bytes16 instanceId) public view returns (bytes[] memory committeePubkeys) {
@@ -455,11 +454,15 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable {
         // validate pegin tx
         (bytes32 blockHash, bytes32 merkleRoot) = MerkleProof.parseBtcBlockHeader(peginProof.rawHeader);
         if (bitcoinSPV.blockHash(peginProof.height) != blockHash) revert InvalidHeader();
-        if (!MerkleProof.verifyMerkleProof(merkleRoot, peginProof.proof, peginTxid, peginProof.index)) revert MerkleVerifyFail();
+        if (!MerkleProof.verifyMerkleProof(merkleRoot, peginProof.proof, peginTxid, peginProof.index)) {
+            revert MerkleVerifyFail();
+        }
 
         // validate committeeSigs
         bytes32 pegin_digest = getPostPeginDigest(instanceId, peginTxid);
-        if (!verifyCommitteeSignatures(pegin_digest, committeeSigs, getCommitteeAddresses(instanceId))) revert InvalidSignatures();
+        if (!verifyCommitteeSignatures(pegin_digest, committeeSigs, getCommitteeAddresses(instanceId))) {
+            revert InvalidSignatures();
+        }
 
         // update storage
         peginData.status = PeginStatus.Withdrawbale;
@@ -468,7 +471,7 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable {
         // mint pegBTC to user
         // deduct a fee from the User to cover the Operator's peg-out reward
         uint64 feeAmountSats = minPeginFeeSats + peginAmountSats * peginFeeRate / rateMultiplier;
-    if (feeAmountSats >= peginAmountSats) revert FeeTooHigh();
+        if (feeAmountSats >= peginAmountSats) revert FeeTooHigh();
         pegBTC.mint(depositorAddress, Converter.amountFromSats(peginAmountSats - feeAmountSats));
         pegBTC.mint(address(this), Converter.amountFromSats(feeAmountSats));
 
@@ -484,17 +487,19 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable {
         // check operator stake
         // Note:committee should check operator's locked stake before pre-signed any graph txns
         address operatorStakeAddress = stakeManagement.pubkeyToAddress(graphData.operatorPubkey);
-    if (operatorStakeAddress == address(0)) revert OperatorNotRegistered();
-    if (stakeManagement.lockedStakeOf(operatorStakeAddress) < minStakeAmount) revert StakeInsufficient();
+        if (operatorStakeAddress == address(0)) revert OperatorNotRegistered();
+        if (stakeManagement.lockedStakeOf(operatorStakeAddress) < minStakeAmount) revert StakeInsufficient();
 
         // check committeeSigs
         bytes32 graph_digest = getPostGraphDigest(instanceId, graphId, graphData);
-        if (!verifyCommitteeSignatures(graph_digest, committeeSigs, getCommitteeAddresses(instanceId))) revert InvalidSignatures();
+        if (!verifyCommitteeSignatures(graph_digest, committeeSigs, getCommitteeAddresses(instanceId))) {
+            revert InvalidSignatures();
+        }
 
         // check graph data
-    if (graphDataMap[graphId].peginTxid != 0) revert GraphAlreadyPosted();
+        if (graphDataMap[graphId].peginTxid != 0) revert GraphAlreadyPosted();
         PeginDataInner storage peginData = peginDataMap[instanceId];
-    if (graphData.peginTxid != peginData.peginTxid) revert GraphPeginTxidMismatch();
+        if (graphData.peginTxid != peginData.peginTxid) revert GraphPeginTxidMismatch();
 
         // store graph data
         graphDataMap[graphId] = graphData;
@@ -503,7 +508,9 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable {
 
     function initWithdraw(bytes16 instanceId, bytes16 graphId) external {
         WithdrawData storage withdrawData = withdrawDataMap[graphId];
-        if (!(withdrawData.status == WithdrawStatus.None || withdrawData.status == WithdrawStatus.Canceled)) revert WithdrawStatusInvalid();
+        if (!(withdrawData.status == WithdrawStatus.None || withdrawData.status == WithdrawStatus.Canceled)) {
+            revert WithdrawStatusInvalid();
+        }
         PeginDataInner storage peginData = peginDataMap[instanceId];
         if (peginData.status != PeginStatus.Withdrawbale) revert NotWithdrawable();
 
@@ -528,7 +535,9 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable {
         WithdrawData storage withdrawData = withdrawDataMap[graphId];
         PeginDataInner storage peginData = peginDataMap[withdrawData.instanceId];
         if (withdrawData.status != WithdrawStatus.Initialized) revert WithdrawStatusInvalid();
-        if (withdrawData.btcBlockHeightAtWithdraw + cancelWithdrawTimelock >= bitcoinSPV.latestConfirmedHeight()) revert TimelockNotExpired();
+        if (withdrawData.btcBlockHeightAtWithdraw + cancelWithdrawTimelock >= bitcoinSPV.latestConfirmedHeight()) {
+            revert TimelockNotExpired();
+        }
         withdrawData.status = WithdrawStatus.Canceled;
         pegBTC.transfer(msg.sender, withdrawData.lockAmount);
         peginData.status = PeginStatus.Withdrawbale;
@@ -543,7 +552,7 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable {
         committeeManagement.executeNoncedSignatures(cancel_digest, nonce, committeeSigs);
         // update storage
         PeginDataInner storage peginData = peginDataMap[withdrawData.instanceId];
-    if (withdrawData.status != WithdrawStatus.Initialized) revert WithdrawStatusInvalid();
+        if (withdrawData.status != WithdrawStatus.Initialized) revert WithdrawStatusInvalid();
         withdrawData.status = WithdrawStatus.Canceled;
         pegBTC.transfer(msg.sender, withdrawData.lockAmount);
         peginData.status = PeginStatus.Withdrawbale;
@@ -566,7 +575,9 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable {
         if (kickoffTxid != graphData.kickoffTxid) revert TxidMismatch();
         (bytes32 blockHash, bytes32 merkleRoot) = MerkleProof.parseBtcBlockHeader(kickoffProof.rawHeader);
         if (bitcoinSPV.blockHash(kickoffProof.height) != blockHash) revert InvalidHeader();
-        if (!MerkleProof.verifyMerkleProof(merkleRoot, kickoffProof.proof, kickoffTxid, kickoffProof.index)) revert MerkleVerifyFail();
+        if (!MerkleProof.verifyMerkleProof(merkleRoot, kickoffProof.proof, kickoffTxid, kickoffProof.index)) {
+            revert MerkleVerifyFail();
+        }
 
         // once kickoff is braodcasted , operator will not be able to cancel withdrawal
         withdrawData.status = WithdrawStatus.Processing;
@@ -585,14 +596,16 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable {
         WithdrawData storage withdrawData = withdrawDataMap[graphId];
         bytes16 instanceId = withdrawData.instanceId;
         PeginDataInner storage peginData = peginDataMap[instanceId];
-    if (withdrawData.status != WithdrawStatus.Processing) revert WithdrawStatusInvalid();
+        if (withdrawData.status != WithdrawStatus.Processing) revert WithdrawStatusInvalid();
 
         GraphData storage graphData = graphDataMap[graphId];
         bytes32 take1Txid = BitvmTxParser.computeTxid(rawTake1Tx);
         if (take1Txid != graphData.take1Txid) revert TxidMismatch();
         (bytes32 blockHash, bytes32 merkleRoot) = MerkleProof.parseBtcBlockHeader(take1Proof.rawHeader);
         if (bitcoinSPV.blockHash(take1Proof.height) != blockHash) revert InvalidHeader();
-        if (!MerkleProof.verifyMerkleProof(merkleRoot, take1Proof.proof, take1Txid, take1Proof.index)) revert MerkleVerifyFail();
+        if (!MerkleProof.verifyMerkleProof(merkleRoot, take1Proof.proof, take1Txid, take1Proof.index)) {
+            revert MerkleVerifyFail();
+        }
 
         peginData.status = PeginStatus.Claimed;
         withdrawData.status = WithdrawStatus.Complete;
@@ -613,14 +626,16 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable {
         WithdrawData storage withdrawData = withdrawDataMap[graphId];
         bytes16 instanceId = withdrawData.instanceId;
         PeginDataInner storage peginData = peginDataMap[instanceId];
-    if (withdrawData.status != WithdrawStatus.Processing) revert WithdrawStatusInvalid();
+        if (withdrawData.status != WithdrawStatus.Processing) revert WithdrawStatusInvalid();
 
         GraphData storage graphData = graphDataMap[graphId];
         bytes32 take2Txid = BitvmTxParser.computeTxid(rawTake2Tx);
         if (take2Txid != graphData.take2Txid) revert TxidMismatch();
         (bytes32 blockHash, bytes32 merkleRoot) = MerkleProof.parseBtcBlockHeader(take2Proof.rawHeader);
         if (bitcoinSPV.blockHash(take2Proof.height) != blockHash) revert InvalidHeader();
-        if (!MerkleProof.verifyMerkleProof(merkleRoot, take2Proof.proof, take2Txid, take2Proof.index)) revert MerkleVerifyFail();
+        if (!MerkleProof.verifyMerkleProof(merkleRoot, take2Proof.proof, take2Txid, take2Proof.index)) {
+            revert MerkleVerifyFail();
+        }
 
         peginData.status = PeginStatus.Claimed;
         withdrawData.status = WithdrawStatus.Complete;
@@ -647,7 +662,7 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable {
         GraphData storage graphData = graphDataMap[graphId];
         bytes16 instanceId = withdrawData.instanceId;
         // Malicious operator may skip initWithdraw & procceedWithdraw
-    if (withdrawData.status == WithdrawStatus.Disproved) revert AlreadyDisproved();
+        if (withdrawData.status == WithdrawStatus.Disproved) revert AlreadyDisproved();
 
         // verify ChallengeStart tx
         bytes32 challengeStartTxid;
@@ -670,9 +685,11 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable {
             if (kickoffVout != BitvmTxParser.CHALLENGE_CONNECTOR_VOUT) revert TxidMismatch();
             (blockHash, merkleRoot) = MerkleProof.parseBtcBlockHeader(challengeStartTxProof.rawHeader);
             if (bitcoinSPV.blockHash(challengeStartTxProof.height) != blockHash) revert DisproveInvalidHeader();
-            if (!MerkleProof.verifyMerkleProof(
-                merkleRoot, challengeStartTxProof.proof, challengeStartTxid, challengeStartTxProof.index
-            )) revert MerkleVerifyFail();
+            if (
+                !MerkleProof.verifyMerkleProof(
+                    merkleRoot, challengeStartTxProof.proof, challengeStartTxid, challengeStartTxProof.index
+                )
+            ) revert MerkleVerifyFail();
         }
 
         // verify ChallengeFinish tx
@@ -709,9 +726,11 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable {
         }
         (blockHash, merkleRoot) = MerkleProof.parseBtcBlockHeader(challengeFinishTxProof.rawHeader);
         if (bitcoinSPV.blockHash(challengeFinishTxProof.height) != blockHash) revert DisproveInvalidHeader();
-        if (!MerkleProof.verifyMerkleProof(
-            merkleRoot, challengeFinishTxProof.proof, challengeFinishTxid, challengeFinishTxProof.index
-        )) revert MerkleVerifyFail();
+        if (
+            !MerkleProof.verifyMerkleProof(
+                merkleRoot, challengeFinishTxProof.proof, challengeFinishTxid, challengeFinishTxProof.index
+            )
+        ) revert MerkleVerifyFail();
         withdrawData.status = WithdrawStatus.Disproved;
 
         // slash Operator & reward Challenger and Disprover

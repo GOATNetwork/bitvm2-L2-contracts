@@ -19,11 +19,11 @@ contract CommitteeManagement is MultiSigVerifier {
 
     // ========== Storage ==========
     // Mapping of committee member -> peerId
-    EnumerableMap.AddressToBytes32Map private committeePeerId;
+    EnumerableMap.AddressToBytes32Map committeePeerId;
     // Set of registered watchtowers
-    EnumerableSet.Bytes32Set private watchtowerList;
+    EnumerableSet.Bytes32Set watchtowerList;
     // Whitelist of contracts allowed to externally consume committee-signed authorizations
-    EnumerableSet.AddressSet private authorizedCallers;
+    EnumerableSet.AddressSet authorizedCallers;
 
     /// @notice Tracks whether a nonced message hash has been consumed on-chain to prevent replay.
     mapping(bytes32 => bool) public executed;
@@ -31,9 +31,21 @@ contract CommitteeManagement is MultiSigVerifier {
     // ========== Constructor ==========
     /// @param initialMembers Initial committee owner addresses
     /// @param requiredSignatures Threshold for a message to be considered authorized
-    constructor(address[] memory initialMembers, uint256 requiredSignatures)
-        MultiSigVerifier(initialMembers, requiredSignatures)
-    {}
+    /// @param initialAuthorizedCallers Initial authorized caller addresses (Gateway, etc.)
+    /// @param initialWatchtowers Initial watchtower addresses
+    constructor(
+        address[] memory initialMembers,
+        uint256 requiredSignatures,
+        address[] memory initialAuthorizedCallers,
+        bytes32[] memory initialWatchtowers
+    ) MultiSigVerifier(initialMembers, requiredSignatures) {
+        for (uint256 i = 0; i < initialAuthorizedCallers.length; i++) {
+            authorizedCallers.add(initialAuthorizedCallers[i]);
+        }
+        for (uint256 i = 0; i < initialWatchtowers.length; i++) {
+            watchtowerList.add(initialWatchtowers[i]);
+        }
+    }
 
     // ========== Views / Getters ==========
     /// @notice Returns whether an address is a current committee member (owner)

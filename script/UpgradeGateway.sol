@@ -1,10 +1,6 @@
 pragma solidity ^0.8.0;
 
 import {Script, console} from "forge-std/Script.sol";
-
-import {IPegBTC} from "../src/interfaces/IPegBTC.sol";
-import {IBitcoinSPV} from "../src/interfaces/IBitcoinSPV.sol";
-
 import {GatewayUpgradeable} from "../src/Gateway.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
