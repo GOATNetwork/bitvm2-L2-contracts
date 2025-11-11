@@ -23,6 +23,32 @@ contract GatewayDebug is GatewayUpgradeable {
     function debugUpdateStakeManagement(address newStakeManagement) external onlyCommittee {
         stakeManagement = StakeManagement(newStakeManagement);
     }
+
+    function debugSetBitvmPolicy(
+        uint64 _minChallengeAmountSats,
+        uint64 _minPeginFeeSats,
+        uint64 _peginFeeRate,
+        uint64 _minOperatorRewardSats,
+        uint64 _operatorRewardRate,
+        uint64 _minStakeAmount,
+        uint64 _minChallengerReward,
+        uint64 _minDisproverReward,
+        uint64 _minSlashAmount
+    ) external onlyCommittee {
+        require(_peginFeeRate <= rateMultiplier, "peginFeeRate too large");
+        require(_operatorRewardRate <= rateMultiplier, "operatorRewardRate too large");
+
+        minChallengeAmountSats = _minChallengeAmountSats;
+        minPeginFeeSats = _minPeginFeeSats;
+        peginFeeRate = _peginFeeRate;
+        minOperatorRewardSats = _minOperatorRewardSats;
+        operatorRewardRate = _operatorRewardRate;
+
+        minStakeAmount = _minStakeAmount;
+        minChallengerReward = _minChallengerReward;
+        minDisproverReward = _minDisproverReward;
+        minSlashAmount = _minSlashAmount;
+    }
 }
 
 contract CommitteeManagementDebug is CommitteeManagement {

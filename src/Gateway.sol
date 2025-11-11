@@ -52,10 +52,10 @@ contract BitvmPolicy {
     uint64 public minOperatorRewardSats;
     uint64 public operatorRewardRate;
 
-    uint64 public minStakeAmount;
-    uint64 public minChallengerReward;
-    uint64 public minDisproverReward;
-    uint64 public minSlashAmount;
+    uint64 public minStakeAmount; // TODO: uint256
+    uint64 public minChallengerReward; // TODO: uint256
+    uint64 public minDisproverReward; // TODO: uint256
+    uint64 public minSlashAmount; // TODO: uint256
 
     // TODO Initializer & setters
 }
@@ -89,6 +89,7 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable {
         uint64 indexed peginAmountSats,
         uint64 feeAmountSats
     );
+    event PostGraphData(bytes16 indexed instanceId, bytes16 indexed graphId);
     event InitWithdraw(
         bytes16 indexed instanceId, bytes16 indexed graphId, address indexed operatorAddress, uint64 withdrawAmountSats
     );
@@ -177,7 +178,7 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable {
         bytes16 instanceId;
         address depositorAddress;
         uint64 peginAmountSats;
-        uint64[3] txnFees; // [ peginPrepare , peginComfirm  peginCancel ]
+        uint64[3] txnFees; // [ peginPrepare , peginConfirm  peginCancel ]
         Utxo[] userInputs;
         bytes32 userXonlyPubkey;
         string userChangeAddress;
@@ -214,7 +215,7 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable {
     CommitteeManagement public committeeManagement;
     StakeManagement public stakeManagement;
 
-    uint256 public responseWindowBlocks = 200; // 200 goat blocks ~ 10 minutes
+    uint256 public responseWindowBlocks = 40; // 40 goat blocks ~ 2 minutes
 
     uint256 public cancelWithdrawTimelock = 144; // 144 btc blocks ~ 24 hours
 
@@ -237,10 +238,12 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable {
         peginFeeRate = 50; // 0.5%
         minOperatorRewardSats = 3000; // 0.00003 BTC
         operatorRewardRate = 30; // 0.3%
-        minStakeAmount = 6000000; // 0.06 BTC
-        minChallengerReward = 1250000; // 0.0125 BTC
-        minDisproverReward = 250000; // 0.0025 BTC
-        minSlashAmount = 3000000; // 0.03 BTC
+
+        minStakeAmount = 60000000000000000; // 0.06 stakeToken(pegBTC)
+        minChallengerReward = 12500000000000000; // 0.0125 stakeToken(pegBTC)
+        minDisproverReward = 2500000000000000; // 0.0025 stakeToken(pegBTC)
+        minSlashAmount = 30000000000000000; // 0.03 stakeToken(pegBTC)
+
         responseWindowBlocks = 200; // 200 goat blocks ~ 10 minutes
         cancelWithdrawTimelock = 144; // 144 btc blocks ~ 24 hours
 
@@ -504,6 +507,8 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable {
         // store graph data
         graphDataMap[graphId] = graphData;
         instanceIdToGraphIds[instanceId].push(graphId);
+
+        emit PostGraphData(instanceId, graphId);
     }
 
     function initWithdraw(bytes16 instanceId, bytes16 graphId) external {
@@ -526,7 +531,7 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable {
         withdrawData.status = WithdrawStatus.Initialized;
         withdrawData.instanceId = instanceId;
         withdrawData.lockAmount = lockAmount;
-        withdrawData.btcBlockHeightAtWithdraw = bitcoinSPV.latestConfirmedHeight();
+        withdrawData.btcBlockHeightAtWithdraw = bitcoinSPV.latestHeight();
 
         emit InitWithdraw(instanceId, graphId, withdrawData.operatorAddress, peginData.peginAmountSats);
     }
@@ -535,7 +540,7 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable {
         WithdrawData storage withdrawData = withdrawDataMap[graphId];
         PeginDataInner storage peginData = peginDataMap[withdrawData.instanceId];
         if (withdrawData.status != WithdrawStatus.Initialized) revert WithdrawStatusInvalid();
-        if (withdrawData.btcBlockHeightAtWithdraw + cancelWithdrawTimelock >= bitcoinSPV.latestConfirmedHeight()) {
+        if (withdrawData.btcBlockHeightAtWithdraw + cancelWithdrawTimelock >= bitcoinSPV.latestHeight()) {
             revert TimelockNotExpired();
         }
         withdrawData.status = WithdrawStatus.Canceled;
