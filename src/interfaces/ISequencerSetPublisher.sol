@@ -4,7 +4,6 @@ pragma solidity ^0.8.28;
 interface ISequencerSetPublisher {
     struct SequencerSet {
         bytes32 sequencerSetHash; // validator_hash
-        bytes32 nextSequencerSetHash; // next_validator_hash
         bytes32 publishersHash;
         bytes32 nextPublishersHash;
         bytes32 p2wshSigHash; // anchor the BTC txn

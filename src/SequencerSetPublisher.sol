@@ -57,7 +57,6 @@ contract SequencerSetPublisher is Initializable, OwnableUpgradeable, ISequencerS
         bytes32 cmt = keccak256(
             abi.encodePacked(
                 ss.sequencerSetHash,
-                ss.nextSequencerSetHash,
                 ss.publishersHash,
                 ss.nextPublishersHash,
                 ss.p2wshSigHash,
@@ -97,8 +96,6 @@ contract SequencerSetPublisher is Initializable, OwnableUpgradeable, ISequencerS
             bytes32 prevCmt = calcMajoritySequencerSetCmtAtHeightOrLatest(latestConfirmedHeight);
             SequencerSet storage prevSs = cmtSequencerSet[prevCmt];
             require(prevSs.nextPublishersHash == ss.publishersHash, InvalidPublisherSet());
-            // TODO: we should check this when update sequencer set.
-            //require(prevSs.nextSequencerSetHash == ss.sequencerSetHash, InvalidSequencerSet());
         }
 
         // ensure valid sigs >= 2/3
