@@ -158,7 +158,6 @@ contract SequencerSetPublisherTest is Test {
 
         ISequencerSetPublisher.SequencerSet memory ss = ISequencerSetPublisher.SequencerSet({
             sequencerSetHash: sequencerSetHash,
-            nextSequencerSetHash: nextSequencerSetHash,
             publishersHash: keccak256(abi.encodePacked(publishers)),
             nextPublishersHash: keccak256(abi.encodePacked(nextPublishers)),
             p2wshSigHash: p2wshSigHash.toEthSignedMessageHash(),
