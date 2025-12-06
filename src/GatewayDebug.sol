@@ -16,38 +16,67 @@ contract GatewayDebug is GatewayUpgradeable {
         pegBTC.mint(to, amount);
     }
 
-    function debugUpdateCommitteeManagement(address newCommitteeManagement) external onlyCommittee {
-        committeeManagement = CommitteeManagement(newCommitteeManagement);
-    }
+    // function debugUpdateCommitteeManagement(address newCommitteeManagement) external onlyCommittee {
+    //     committeeManagement = CommitteeManagement(newCommitteeManagement);
+    // }
 
-    function debugUpdateStakeManagement(address newStakeManagement) external onlyCommittee {
-        stakeManagement = StakeManagement(newStakeManagement);
-    }
+    // function debugUpdateStakeManagement(address newStakeManagement) external onlyCommittee {
+    //     stakeManagement = StakeManagement(newStakeManagement);
+    // }
 
-    function debugSetBitvmPolicy(
-        uint64 _minChallengeAmountSats,
-        uint64 _minPeginFeeSats,
-        uint64 _peginFeeRate,
-        uint64 _minOperatorRewardSats,
-        uint64 _operatorRewardRate,
-        uint64 _minStakeAmount,
-        uint64 _minChallengerReward,
-        uint64 _minDisproverReward,
-        uint64 _minSlashAmount
-    ) external onlyCommittee {
-        require(_peginFeeRate <= rateMultiplier, "peginFeeRate too large");
-        require(_operatorRewardRate <= rateMultiplier, "operatorRewardRate too large");
+    // function debugSetBitvmPolicy(
+    //     uint64 _minChallengeAmountSats,
+    //     uint64 _minPeginFeeSats,
+    //     uint64 _peginFeeRate,
+    //     uint64 _minOperatorRewardSats,
+    //     uint64 _operatorRewardRate,
+    //     uint64 _minStakeAmount,
+    //     uint64 _minChallengerReward,
+    //     uint64 _minDisproverReward,
+    //     uint64 _minSlashAmount
+    // ) external onlyCommittee {
+    //     require(_peginFeeRate <= rateMultiplier, "peginFeeRate too large");
+    //     require(_operatorRewardRate <= rateMultiplier, "operatorRewardRate too large");
 
-        minChallengeAmountSats = _minChallengeAmountSats;
-        minPeginFeeSats = _minPeginFeeSats;
-        peginFeeRate = _peginFeeRate;
-        minOperatorRewardSats = _minOperatorRewardSats;
-        operatorRewardRate = _operatorRewardRate;
+    //     minChallengeAmountSats = _minChallengeAmountSats;
+    //     minPeginFeeSats = _minPeginFeeSats;
+    //     peginFeeRate = _peginFeeRate;
+    //     minOperatorRewardSats = _minOperatorRewardSats;
+    //     operatorRewardRate = _operatorRewardRate;
 
-        minStakeAmount = _minStakeAmount;
-        minChallengerReward = _minChallengerReward;
-        minDisproverReward = _minDisproverReward;
-        minSlashAmount = _minSlashAmount;
+    //     minStakeAmount = _minStakeAmount;
+    //     minChallengerReward = _minChallengerReward;
+    //     minDisproverReward = _minDisproverReward;
+    //     minSlashAmount = _minSlashAmount;
+    // }
+
+    // function debugClearData() external onlyCommittee {
+    //     for (uint256 i = 0; i < instanceIds.length; i++) {
+    //         bytes16 instanceId = instanceIds[i];
+
+    //         bytes16[] storage graphIds = instanceIdToGraphIds[instanceId];
+    //         for (uint256 j = 0; j < graphIds.length; j++) {
+    //             bytes16 graphId = graphIds[j];
+    //             delete graphDataMap[graphId];
+    //             delete withdrawDataMap[graphId];
+    //         }
+
+    //         delete instanceIdToGraphIds[instanceId];
+    //         delete peginDataMap[instanceId];
+    //     }
+
+    //     delete instanceIds;
+    // }
+
+    function debugCancelWithdraw(bytes16 graphId) external onlyOperator(graphId) {
+        WithdrawData storage withdrawData = withdrawDataMap[graphId];
+        PeginDataInner storage peginData = peginDataMap[withdrawData.instanceId];
+        require(withdrawData.status == WithdrawStatus.Initialized, "x");
+        withdrawData.status = WithdrawStatus.Canceled;
+        pegBTC.transfer(msg.sender, withdrawData.lockAmount);
+        peginData.status = PeginStatus.Withdrawbale;
+
+        emit CancelWithdraw(withdrawData.instanceId, graphId, msg.sender);
     }
 }
 

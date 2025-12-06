@@ -6,7 +6,7 @@ import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.s
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 contract UpgradeGateway is Script {
-    address public deployer;
+    address public sender;
     address public proxyAdmin;
     address payable public gateway;
 
@@ -16,9 +16,9 @@ contract UpgradeGateway is Script {
     }
 
     function run() public {
-        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
-        deployer = vm.createWallet(deployerPrivateKey).addr;
-        vm.startBroadcast(deployerPrivateKey);
+        uint256 senderPrivateKey = vm.envUint("PRIVATE_KEY");
+        sender = vm.createWallet(senderPrivateKey).addr;
+        vm.startBroadcast(senderPrivateKey);
         upgrade();
         vm.stopBroadcast();
     }
