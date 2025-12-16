@@ -33,9 +33,16 @@ contract DeployGateway is Script {
 
     function deploy() public {
         GatewayDebug gatewayImpl = new GatewayDebug();
-        console.log("Gateway implementation contract address: ", address(gatewayImpl));
+        console.log(
+            "Gateway implementation contract address: ",
+            address(gatewayImpl)
+        );
 
-        UpgradeableProxy gatewayProxy = new UpgradeableProxy(address(gatewayImpl), deployer, "");
+        UpgradeableProxy gatewayProxy = new UpgradeableProxy(
+            address(gatewayImpl),
+            deployer,
+            ""
+        );
         console.log("Gateway proxy contract address: ", address(gatewayProxy));
         GatewayDebug gateway = GatewayDebug(payable(gatewayProxy));
 
@@ -44,25 +51,63 @@ contract DeployGateway is Script {
 
         address[] memory initialMembers = _readSequentialAddresses("COMMITTEE");
         uint256 initialRequired = (initialMembers.length * 2 + 2) / 3;
-        bytes32[] memory initialWatchtowers = _readSequentialBytes32("WATCHTOWER");
+        bytes32[] memory initialWatchtowers = _readSequentialBytes32(
+            "WATCHTOWER"
+        );
         address[] memory initialAuthorizedCallers = new address[](1);
         initialAuthorizedCallers[0] = address(gateway);
 
         CommitteeManagementDebug committeeImpl = new CommitteeManagementDebug();
-        console.log("CommitteeManagement implementation contract address: ", address(committeeImpl));
-        UpgradeableProxy committeeProxy = new UpgradeableProxy(address(committeeImpl), deployer, "");
-        console.log("CommitteeManagement proxy contract address: ", address(committeeProxy));
-        CommitteeManagement committeeManagementImpl = CommitteeManagement(address(committeeProxy));
-        committeeManagementImpl.initialize(initialMembers, initialRequired, initialAuthorizedCallers, initialWatchtowers);
-        ICommitteeManagement committeeManagement = ICommitteeManagement(address(committeeProxy));
+        console.log(
+            "CommitteeManagement implementation contract address: ",
+            address(committeeImpl)
+        );
+        UpgradeableProxy committeeProxy = new UpgradeableProxy(
+            address(committeeImpl),
+            deployer,
+            ""
+        );
+        console.log(
+            "CommitteeManagement proxy contract address: ",
+            address(committeeProxy)
+        );
+        CommitteeManagement committeeManagementImpl = CommitteeManagement(
+            address(committeeProxy)
+        );
+        committeeManagementImpl.initialize(
+            initialMembers,
+            initialRequired,
+            initialAuthorizedCallers,
+            initialWatchtowers
+        );
+        ICommitteeManagement committeeManagement = ICommitteeManagement(
+            address(committeeProxy)
+        );
 
         StakeManagement stakeImpl = new StakeManagement();
-        console.log("StakeManagement implementation contract address: ", address(stakeImpl));
-        UpgradeableProxy stakeProxy = new UpgradeableProxy(address(stakeImpl), deployer, "");
-        console.log("StakeManagement proxy contract address: ", address(stakeProxy));
-        StakeManagement stakeManagementImpl = StakeManagement(address(stakeProxy));
-        stakeManagementImpl.initialize(IERC20(address(pegBTC)), address(gateway));
-        IStakeManagement stakeManagement = IStakeManagement(address(stakeProxy));
+        console.log(
+            "StakeManagement implementation contract address: ",
+            address(stakeImpl)
+        );
+        UpgradeableProxy stakeProxy = new UpgradeableProxy(
+            address(stakeImpl),
+            deployer,
+            ""
+        );
+        console.log(
+            "StakeManagement proxy contract address: ",
+            address(stakeProxy)
+        );
+        StakeManagement stakeManagementImpl = StakeManagement(
+            address(stakeProxy)
+        );
+        stakeManagementImpl.initialize(
+            IERC20(address(pegBTC)),
+            address(gateway)
+        );
+        IStakeManagement stakeManagement = IStakeManagement(
+            address(stakeProxy)
+        );
 
         gateway.initialize(
             IPegBTC(address(pegBTC)),
@@ -72,10 +117,14 @@ contract DeployGateway is Script {
         );
     }
 
-    function _readSequentialAddresses(string memory baseKey) internal view returns (address[] memory out) {
+    function _readSequentialAddresses(
+        string memory baseKey
+    ) internal view returns (address[] memory out) {
         uint256 count = 0;
         while (true) {
-            string memory key = string(abi.encodePacked(baseKey, "_", vm.toString(count)));
+            string memory key = string(
+                abi.encodePacked(baseKey, "_", vm.toString(count))
+            );
             address val = vm.envOr(key, address(0));
             if (val == address(0)) break;
             unchecked {
@@ -84,15 +133,21 @@ contract DeployGateway is Script {
         }
         out = new address[](count);
         for (uint256 i = 0; i < count; i++) {
-            string memory key = string(abi.encodePacked(baseKey, "_", vm.toString(i)));
+            string memory key = string(
+                abi.encodePacked(baseKey, "_", vm.toString(i))
+            );
             out[i] = vm.envAddress(key);
         }
     }
 
-    function _readSequentialBytes32(string memory baseKey) internal view returns (bytes32[] memory out) {
+    function _readSequentialBytes32(
+        string memory baseKey
+    ) internal view returns (bytes32[] memory out) {
         uint256 count = 0;
         while (true) {
-            string memory key = string(abi.encodePacked(baseKey, "_", vm.toString(count)));
+            string memory key = string(
+                abi.encodePacked(baseKey, "_", vm.toString(count))
+            );
             bytes32 val = vm.envOr(key, bytes32(0));
             if (val == bytes32(0)) break;
             unchecked {
@@ -101,7 +156,9 @@ contract DeployGateway is Script {
         }
         out = new bytes32[](count);
         for (uint256 i = 0; i < count; i++) {
-            string memory key = string(abi.encodePacked(baseKey, "_", vm.toString(i)));
+            string memory key = string(
+                abi.encodePacked(baseKey, "_", vm.toString(i))
+            );
             out[i] = vm.envBytes32(key);
         }
     }
