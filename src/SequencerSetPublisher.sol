@@ -1,21 +1,32 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {
+    Initializable
+} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {
+    OwnableUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
+import {
+    MessageHashUtils
+} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 
-import "./MultiSigVerifier.sol";
-import "./interfaces/ISequencerSetPublisher.sol";
-import "./Constants.sol";
+import {MultiSigVerifier} from "./MultiSigVerifier.sol";
+import {ISequencerSetPublisher} from "./interfaces/ISequencerSetPublisher.sol";
+import {Constants} from "./Constants.sol";
 
 // Sequencer Set Publisher
-contract SequencerSetPublisher is Initializable, OwnableUpgradeable, ISequencerSetPublisher {
+contract SequencerSetPublisher is
+    Initializable,
+    OwnableUpgradeable,
+    ISequencerSetPublisher
+{
     using ECDSA for bytes32;
     using MessageHashUtils for bytes32;
 
-    mapping(uint256 height => mapping(address publisher => bytes32 cmt)) public heightSequencerCmt;
+    mapping(uint256 height => mapping(address publisher => bytes32 cmt))
+        public heightSequencerCmt;
     mapping(bytes32 cmt => uint256 cnt) public sequencerCmtCnt;
     mapping(uint256 height => address[]) public heightPublishers;
 
@@ -31,11 +42,20 @@ contract SequencerSetPublisher is Initializable, OwnableUpgradeable, ISequencerS
         address[] calldata initPublishers,
         bytes[] calldata initPublisherBTCPubkeys
     ) public initializer {
-        require(multiSigVerifierAddress != address(0), "Invalid multisig address");
-        require(initPublisherBTCPubkeys.length == initPublishers.length, "Invalid Publishers");
+        require(
+            multiSigVerifierAddress != address(0),
+            "Invalid multisig address"
+        );
+        require(
+            initPublisherBTCPubkeys.length == initPublishers.length,
+            "Invalid Publishers"
+        );
         __Ownable_init(initialOwner);
         multiSigVerifier = MultiSigVerifier(multiSigVerifierAddress);
-        require(multiSigVerifier.ownerCount() == 0, "Verifier already initialized");
+        require(
+            multiSigVerifier.ownerCount() == 0,
+            "Verifier already initialized"
+        );
         // TODO: deploy a dedicated MultiSigVerifier proxy here once we stop injecting the address externally.
         // ensure valid sigs >= 2/3
         uint256 quorum = (initPublishers.length * 2 + 2) / 3;
@@ -51,13 +71,27 @@ contract SequencerSetPublisher is Initializable, OwnableUpgradeable, ISequencerS
     /// @notice Publish a new sequencer set, which should be signed by the older publishers.
     /// @param ss The Sequencer Set
     /// @param signature The P2WSH signature
-    function updateSequencerSet(SequencerSet calldata ss, bytes calldata signature) external override {
-        require(ss.goatBlockNumber >= latestConfirmedHeight, InvalidGOATHeight());
+    function updateSequencerSet(
+        SequencerSet calldata ss,
+        bytes calldata signature
+    ) external override {
+        require(
+            ss.goatBlockNumber >= latestConfirmedHeight,
+            InvalidGOATHeight()
+        );
         require(multiSigVerifier.isOwner(msg.sender), InvalidPublisherSet());
-        require(msg.sender == ss.p2wshSigHash.recover(signature), P2WSHSignatureMismatch());
+        require(
+            msg.sender == ss.p2wshSigHash.recover(signature),
+            P2WSHSignatureMismatch()
+        );
         // Ensure the publisher set is not changed.
-        bytes32 expectedPublishersHash = keccak256(abi.encodePacked(multiSigVerifier.getOwners()));
-        require(ss.publishersHash == expectedPublishersHash, MismatchPublisher());
+        bytes32 expectedPublishersHash = keccak256(
+            abi.encodePacked(multiSigVerifier.getOwners())
+        );
+        require(
+            ss.publishersHash == expectedPublishersHash,
+            MismatchPublisher()
+        );
 
         bytes32 cmt = keccak256(
             abi.encodePacked(
@@ -69,7 +103,10 @@ contract SequencerSetPublisher is Initializable, OwnableUpgradeable, ISequencerS
             )
         );
         // Avoid double commit
-        require(heightSequencerCmt[ss.goatBlockNumber][msg.sender] == bytes32(0), DoubleCommit());
+        require(
+            heightSequencerCmt[ss.goatBlockNumber][msg.sender] == bytes32(0),
+            DoubleCommit()
+        );
 
         heightSequencerCmt[ss.goatBlockNumber][msg.sender] = cmt;
         sequencerCmtCnt[cmt] += 1;
@@ -93,19 +130,33 @@ contract SequencerSetPublisher is Initializable, OwnableUpgradeable, ISequencerS
         require(height == ss.goatBlockNumber, InvalidGOATHeight());
 
         address[] memory publishers = multiSigVerifier.getOwners();
-        bytes32 expectedPublishersHash = keccak256(abi.encodePacked(publishers));
-        require(ss.publishersHash == expectedPublishersHash, MismatchPublisher());
+        bytes32 expectedPublishersHash = keccak256(
+            abi.encodePacked(publishers)
+        );
+        require(
+            ss.publishersHash == expectedPublishersHash,
+            MismatchPublisher()
+        );
 
         if (latestConfirmedHeight > 0) {
             // check the continuality of the update chain
-            bytes32 prevCmt = calcMajoritySequencerSetCmtAtHeightOrLatest(latestConfirmedHeight);
+            bytes32 prevCmt = calcMajoritySequencerSetCmtAtHeightOrLatest(
+                latestConfirmedHeight
+            );
             SequencerSet storage prevSs = cmtSequencerSet[prevCmt];
-            require(prevSs.nextPublishersHash == ss.publishersHash, InvalidPublisherSet());
+            require(
+                prevSs.nextPublishersHash == ss.publishersHash,
+                InvalidPublisherSet()
+            );
         }
 
         // ensure valid sigs >= 2/3
         uint256 quorum = (newPublishers.length * 2 + 2) / 3;
-        multiSigVerifier.updateOwners(newPublishers, quorum, changePublisherSigs);
+        multiSigVerifier.updateOwners(
+            newPublishers,
+            quorum,
+            changePublisherSigs
+        );
 
         for (uint256 i = 0; i < newPublisherBTCPubkeys.length; i++) {
             assert(newPublisherBTCPubkeys[i].length == 33);
@@ -115,7 +166,9 @@ contract SequencerSetPublisher is Initializable, OwnableUpgradeable, ISequencerS
     }
 
     /// @notice Check if we have an aggrement on the cmt of the latest height.
-    function calcMajoritySequencerSetCmtAtHeightOrLatest(uint256 height) public view returns (bytes32) {
+    function calcMajoritySequencerSetCmtAtHeightOrLatest(
+        uint256 height
+    ) public view returns (bytes32) {
         require(height > 0, InvalidGOATHeight());
         address[] memory publishers = heightPublishers[height];
 
@@ -130,7 +183,10 @@ contract SequencerSetPublisher is Initializable, OwnableUpgradeable, ISequencerS
             }
         }
 
-        require(quorum * 3 >= 2 * publishers.length, InvalidQuorumSequencerSet());
+        require(
+            quorum * 3 >= 2 * publishers.length,
+            InvalidQuorumSequencerSet()
+        );
         return agreement;
     }
 }

@@ -6,6 +6,8 @@ import {IPegBTC} from "../src/interfaces/IPegBTC.sol";
 import {IBitcoinSPV} from "../src/interfaces/IBitcoinSPV.sol";
 import {CommitteeManagement} from "../src/CommitteeManagement.sol";
 import {StakeManagement} from "../src/StakeManagement.sol";
+import {ICommitteeManagement} from "../src/interfaces/ICommitteeManagement.sol";
+import {IStakeManagement} from "../src/interfaces/IStakeManagement.sol";
 
 import {GatewayUpgradeable} from "../src/Gateway.sol";
 import {PegBTC} from "../src/PegBTC.sol";
@@ -53,22 +55,24 @@ contract DeployGateway is Script {
         console.log("CommitteeManagement implementation contract address: ", address(committeeImpl));
         UpgradeableProxy committeeProxy = new UpgradeableProxy(address(committeeImpl), deployer, "");
         console.log("CommitteeManagement proxy contract address: ", address(committeeProxy));
-        CommitteeManagement committeeManagement = CommitteeManagement(address(committeeProxy));
-        committeeManagement.initialize(initialMembers, initialRequired, initialAuthorizedCallers, initialWatchtowers);
+        CommitteeManagement committeeManagementImpl = CommitteeManagement(address(committeeProxy));
+        committeeManagementImpl.initialize(initialMembers, initialRequired, initialAuthorizedCallers, initialWatchtowers);
+        ICommitteeManagement committeeManagement = ICommitteeManagement(address(committeeProxy));
 
         // Deploy StakeManagement implementation + proxy
         StakeManagement stakeImpl = new StakeManagement();
         console.log("StakeManagement implementation contract address: ", address(stakeImpl));
         UpgradeableProxy stakeProxy = new UpgradeableProxy(address(stakeImpl), deployer, "");
         console.log("StakeManagement proxy contract address: ", address(stakeProxy));
-        StakeManagement stakeManagement = StakeManagement(address(stakeProxy));
-        stakeManagement.initialize(IERC20(address(pegBTC)), address(gateway));
+        StakeManagement stakeManagementImpl = StakeManagement(address(stakeProxy));
+        stakeManagementImpl.initialize(IERC20(address(pegBTC)), address(gateway));
+        IStakeManagement stakeManagement = IStakeManagement(address(stakeProxy));
 
         gateway.initialize(
             IPegBTC(address(pegBTC)),
             IBitcoinSPV(bitcoinSPV),
-            CommitteeManagement(address(committeeManagement)),
-            StakeManagement(address(stakeManagement))
+            committeeManagement,
+            stakeManagement
         );
     }
 

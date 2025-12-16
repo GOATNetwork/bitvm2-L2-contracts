@@ -5,5 +5,17 @@ interface ICommitteeManagement {
     function isCommitteeMember(address member) external view returns (bool);
     function committeeSize() external view returns (uint256);
     function quorumSize() external view returns (uint256);
-    function verifySignatures(bytes32 msgHash, bytes[] memory signatures) external view returns (bool);
+    function verifySignatures(
+        bytes32 msgHash,
+        bytes[] memory signatures
+    ) external view returns (bool);
+    function getNoncedDigest(
+        bytes32 msgHash,
+        uint256 nonce
+    ) external view returns (bytes32);
+    function executeNoncedSignatures(
+        bytes32 msgHash,
+        uint256 nonce,
+        bytes[] memory signatures
+    ) external;
 }
