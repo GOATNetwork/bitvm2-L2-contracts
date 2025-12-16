@@ -39,7 +39,8 @@ contract SequencerSetPublisher is Initializable, OwnableUpgradeable, ISequencerS
             assert(initPublisherBTCPubkeys[i].length == 33);
             publisherBTCPubkeys[initPublishers[i]] = initPublisherBTCPubkeys[i];
         }
-        multiSigVerifier = new MultiSigVerifier(initPublishers, quorum);
+        multiSigVerifier = new MultiSigVerifier();
+        multiSigVerifier.initialize(initPublishers, quorum);
         heightPublishers[0] = initPublishers;
     }
 

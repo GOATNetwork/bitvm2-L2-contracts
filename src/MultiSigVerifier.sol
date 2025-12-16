@@ -1,11 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
+import {
+    Initializable
+} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {
+    MessageHashUtils
+} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 
 /// @title Simple Multi-Signature Verifier with Owner Rotation and Anti-Replay
-contract MultiSigVerifier {
+contract MultiSigVerifier is Initializable {
     using ECDSA for bytes32;
     using MessageHashUtils for bytes32;
 
@@ -16,21 +21,48 @@ contract MultiSigVerifier {
     uint256 public requiredSignatures;
     uint256 public nonce;
 
-    event OwnersUpdated(address[] newOwners, uint256 newRequired, uint256 newNonce);
+    event OwnersUpdated(
+        address[] newOwners,
+        uint256 newRequired,
+        uint256 newNonce
+    );
 
-    constructor(address[] memory owners, uint256 _requiredSignatures) {
+    function initialize(
+        address[] calldata owners,
+        uint256 _requiredSignatures
+    ) external initializer {
+        __MultiSigVerifier_init(owners, _requiredSignatures);
+    }
+
+    function __MultiSigVerifier_init(
+        address[] memory owners,
+        uint256 _requiredSignatures
+    ) internal onlyInitializing {
+        __MultiSigVerifier_init_unchained(owners, _requiredSignatures);
+    }
+
+    function __MultiSigVerifier_init_unchained(
+        address[] memory owners,
+        uint256 _requiredSignatures
+    ) internal onlyInitializing {
         _setOwners(owners, _requiredSignatures);
         nonce = 0;
     }
 
     /// @notice Verify if a message has enough valid signatures from the current owner set.
-    function verify(bytes32 messageHash, bytes[] memory signatures) public view returns (bool) {
+    function verify(
+        bytes32 messageHash,
+        bytes[] memory signatures
+    ) public view returns (bool) {
         uint256 validSignatures = 0;
         address[] memory seen = new address[](signatures.length);
 
         for (uint256 i = 0; i < signatures.length; i++) {
             address signer = messageHash.recover(signatures[i]);
-            if (isOwner[signer] && !_alreadySigned(seen, signer, validSignatures)) {
+            if (
+                isOwner[signer] &&
+                !_alreadySigned(seen, signer, validSignatures)
+            ) {
                 seen[validSignatures] = signer;
                 validSignatures++;
             }
@@ -39,11 +71,20 @@ contract MultiSigVerifier {
     }
 
     /// @notice Update the owner set and threshold, authorized by the CURRENT owners.
-    function updateOwners(address[] calldata newOwners, uint256 newRequired, bytes[] calldata signatures) external {
+    function updateOwners(
+        address[] calldata newOwners,
+        uint256 newRequired,
+        bytes[] calldata signatures
+    ) external {
         require(newOwners.length > 0, "Owners required");
-        require(newRequired > 0 && newRequired <= newOwners.length, "Invalid threshold");
+        require(
+            newRequired > 0 && newRequired <= newOwners.length,
+            "Invalid threshold"
+        );
 
-        bytes32 digest = keccak256(abi.encodePacked(nonce, newOwners, newRequired));
+        bytes32 digest = keccak256(
+            abi.encodePacked(nonce, newOwners, newRequired)
+        );
 
         require(verify(digest, signatures), "No enough valid owner sigs");
 
@@ -56,9 +97,15 @@ contract MultiSigVerifier {
     /// ----------------------------------------------------------------
     /// internal helpers
     /// ----------------------------------------------------------------
-    function _setOwners(address[] memory owners, uint256 _requiredSignatures) internal {
+    function _setOwners(
+        address[] memory owners,
+        uint256 _requiredSignatures
+    ) internal {
         require(owners.length > 0, "Owners required");
-        require(_requiredSignatures > 0 && _requiredSignatures <= owners.length, "Invalid threshold");
+        require(
+            _requiredSignatures > 0 && _requiredSignatures <= owners.length,
+            "Invalid threshold"
+        );
 
         for (uint256 i = 0; i < owners.length; i++) {
             address o = owners[i];
@@ -71,7 +118,10 @@ contract MultiSigVerifier {
         requiredSignatures = _requiredSignatures;
     }
 
-    function _applyOwners(address[] calldata newOwners, uint256 _requiredSignatures) internal {
+    function _applyOwners(
+        address[] calldata newOwners,
+        uint256 _requiredSignatures
+    ) internal {
         // clear old owners
         for (uint256 i = 0; i < ownerList.length; i++) {
             isOwner[ownerList[i]] = false;
@@ -93,7 +143,11 @@ contract MultiSigVerifier {
         requiredSignatures = _requiredSignatures;
     }
 
-    function _alreadySigned(address[] memory signers, address signer, uint256 count) internal pure returns (bool) {
+    function _alreadySigned(
+        address[] memory signers,
+        address signer,
+        uint256 count
+    ) internal pure returns (bool) {
         for (uint256 i = 0; i < count; i++) {
             if (signers[i] == signer) return true;
         }
@@ -103,4 +157,6 @@ contract MultiSigVerifier {
     function getOwners() external view returns (address[] memory) {
         return ownerList;
     }
+
+    uint256[50] private __gap;
 }

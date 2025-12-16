@@ -32,7 +32,8 @@ contract MultiSigVerifierTest is Test {
         message = keccak256("hello world").toEthSignedMessageHash();
 
         // Require at least 2 signatures
-        verifier = new MultiSigVerifier(owners, 2);
+        verifier = new MultiSigVerifier();
+        verifier.initialize(owners, 2);
     }
 
     function testVerifyWithEnoughSignatures() public view {

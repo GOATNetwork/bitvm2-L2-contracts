@@ -10,8 +10,6 @@ import {StakeManagement} from "../src/StakeManagement.sol";
 import {GatewayUpgradeable} from "../src/Gateway.sol";
 import {PegBTC} from "../src/PegBTC.sol";
 import {UpgradeableProxy} from "../src/UpgradeableProxy.sol";
-import {CommitteeManagement} from "../src/CommitteeManagement.sol";
-import {StakeManagement} from "../src/StakeManagement.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract DeployGateway is Script {
@@ -32,31 +30,39 @@ contract DeployGateway is Script {
     }
 
     function deploy() public {
-        // deploy contracts
+        // deploy gateway implementation + proxy
         GatewayUpgradeable gatewayImpl = new GatewayUpgradeable();
         console.log("Gateway implementation contract address: ", address(gatewayImpl));
 
-        UpgradeableProxy proxy = new UpgradeableProxy(address(gatewayImpl), deployer, "");
-        console.log("Gateway proxy contract contract address: ", address(proxy));
-        GatewayUpgradeable gateway = GatewayUpgradeable(payable(proxy));
+        UpgradeableProxy gatewayProxy = new UpgradeableProxy(address(gatewayImpl), deployer, "");
+        console.log("Gateway proxy contract address: ", address(gatewayProxy));
+        GatewayUpgradeable gateway = GatewayUpgradeable(payable(gatewayProxy));
 
         PegBTC pegBTC = new PegBTC(address(gateway));
         console.log("PegBTC contract address: ", address(pegBTC));
 
         // Read committee config from env
-        // - COMMITTEE_0, COMMITTEE_1, ... (addresses)
-        // - WATCHTOWER_0, WATCHTOWER_1, ... (bytes32)
         address[] memory initialMembers = _readSequentialAddresses("COMMITTEE");
         uint256 initialRequired = (initialMembers.length * 2 + 2) / 3;
         bytes32[] memory initialWatchtowers = _readSequentialBytes32("WATCHTOWER");
         address[] memory initialAuthorizedCallers = new address[](1);
         initialAuthorizedCallers[0] = address(gateway);
-        CommitteeManagement committeeManagement =
-            new CommitteeManagement(initialMembers, initialRequired, initialAuthorizedCallers, initialWatchtowers);
-        console.log("CommitteeManagement contract address: ", address(committeeManagement));
 
-        StakeManagement stakeManagement = new StakeManagement(IERC20(address(pegBTC)), address(gateway));
-        console.log("StakeManagement contract address: ", address(stakeManagement));
+        // Deploy CommitteeManagement implementation + proxy
+        CommitteeManagement committeeImpl = new CommitteeManagement();
+        console.log("CommitteeManagement implementation contract address: ", address(committeeImpl));
+        UpgradeableProxy committeeProxy = new UpgradeableProxy(address(committeeImpl), deployer, "");
+        console.log("CommitteeManagement proxy contract address: ", address(committeeProxy));
+        CommitteeManagement committeeManagement = CommitteeManagement(address(committeeProxy));
+        committeeManagement.initialize(initialMembers, initialRequired, initialAuthorizedCallers, initialWatchtowers);
+
+        // Deploy StakeManagement implementation + proxy
+        StakeManagement stakeImpl = new StakeManagement();
+        console.log("StakeManagement implementation contract address: ", address(stakeImpl));
+        UpgradeableProxy stakeProxy = new UpgradeableProxy(address(stakeImpl), deployer, "");
+        console.log("StakeManagement proxy contract address: ", address(stakeProxy));
+        StakeManagement stakeManagement = StakeManagement(address(stakeProxy));
+        stakeManagement.initialize(IERC20(address(pegBTC)), address(gateway));
 
         gateway.initialize(
             IPegBTC(address(pegBTC)),
@@ -66,10 +72,7 @@ contract DeployGateway is Script {
         );
     }
 
-    // Helpers: read env arrays as sequential variables with numeric suffixes
-    // Example: BASE=PREFIX, reads PREFIX_0, PREFIX_1, ... until a default is hit.
     function _readSequentialAddresses(string memory baseKey) internal view returns (address[] memory out) {
-        // first pass: count
         uint256 count = 0;
         while (true) {
             string memory key = string(abi.encodePacked(baseKey, "_", vm.toString(count)));
@@ -87,7 +90,6 @@ contract DeployGateway is Script {
     }
 
     function _readSequentialBytes32(string memory baseKey) internal view returns (bytes32[] memory out) {
-        // first pass: count
         uint256 count = 0;
         while (true) {
             string memory key = string(abi.encodePacked(baseKey, "_", vm.toString(count)));
