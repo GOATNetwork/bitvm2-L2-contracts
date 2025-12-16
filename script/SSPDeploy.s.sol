@@ -3,6 +3,7 @@ pragma solidity ^0.8.28;
 
 import "forge-std/Script.sol";
 import "../src/SequencerSetPublisher.sol";
+import "../src/MultiSigVerifier.sol";
 
 contract Deploy is Script {
     function run() external {
@@ -26,8 +27,9 @@ contract Deploy is Script {
         vm.startBroadcast();
 
         SequencerSetPublisher publisher = new SequencerSetPublisher();
+        MultiSigVerifier multiSigVerifier = new MultiSigVerifier();
 
-        publisher.initialize(initialOwner, initPublishers, initPublisherBTCPubkeys);
+        publisher.initialize(initialOwner, address(multiSigVerifier), initPublishers, initPublisherBTCPubkeys);
 
         vm.stopBroadcast();
 

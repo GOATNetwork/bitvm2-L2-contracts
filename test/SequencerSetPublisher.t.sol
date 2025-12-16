@@ -66,8 +66,14 @@ contract SequencerSetPublisherTest is Test {
         initPublishers[2] = vm.addr(batch[2]);
 
         sspublisher = new SequencerSetPublisher();
+        MultiSigVerifier verifier = new MultiSigVerifier();
 
-        sspublisher.initialize(owner, initPublishers, _get_pubkey_from_prvkey(initPublishers.length));
+        sspublisher.initialize(
+            owner,
+            address(verifier),
+            initPublishers,
+            _get_pubkey_from_prvkey(initPublishers.length)
+        );
     }
 
     function testInitialize() public view {

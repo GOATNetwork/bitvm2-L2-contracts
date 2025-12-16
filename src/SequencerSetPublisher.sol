@@ -27,11 +27,16 @@ contract SequencerSetPublisher is Initializable, OwnableUpgradeable, ISequencerS
 
     function initialize(
         address initialOwner,
+        address multiSigVerifierAddress,
         address[] calldata initPublishers,
         bytes[] calldata initPublisherBTCPubkeys
     ) public initializer {
+        require(multiSigVerifierAddress != address(0), "Invalid multisig address");
         require(initPublisherBTCPubkeys.length == initPublishers.length, "Invalid Publishers");
         __Ownable_init(initialOwner);
+        multiSigVerifier = MultiSigVerifier(multiSigVerifierAddress);
+        require(multiSigVerifier.ownerCount() == 0, "Verifier already initialized");
+        // TODO: deploy a dedicated MultiSigVerifier proxy here once we stop injecting the address externally.
         // ensure valid sigs >= 2/3
         uint256 quorum = (initPublishers.length * 2 + 2) / 3;
         latestConfirmedHeight = 0;
@@ -39,7 +44,6 @@ contract SequencerSetPublisher is Initializable, OwnableUpgradeable, ISequencerS
             assert(initPublisherBTCPubkeys[i].length == 33);
             publisherBTCPubkeys[initPublishers[i]] = initPublisherBTCPubkeys[i];
         }
-        multiSigVerifier = new MultiSigVerifier();
         multiSigVerifier.initialize(initPublishers, quorum);
         heightPublishers[0] = initPublishers;
     }
