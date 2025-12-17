@@ -232,6 +232,83 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable, IGateway {
         return committeeManagement.getNoncedDigest(msgHash, nonce);
     }
 
+    function _operatorReward(
+        uint64 peginAmountSats
+    ) internal view returns (uint64) {
+        return
+            minOperatorRewardSats +
+            (peginAmountSats * operatorRewardRate) /
+            rateMultiplier;
+    }
+
+    function _verifyMerkleInclusion(
+        MerkleProof.BitcoinTxProof calldata proof,
+        bytes32 txid,
+        bool disproveContext
+    ) internal view {
+        (bytes32 blockHash, bytes32 merkleRoot) = MerkleProof
+            .parseBtcBlockHeader(proof.rawHeader);
+        if (bitcoinSPV.blockHash(proof.height) != blockHash) {
+            if (disproveContext) revert DisproveInvalidHeader();
+            revert InvalidHeader();
+        }
+        if (
+            !MerkleProof.verifyMerkleProof(
+                merkleRoot,
+                proof.proof,
+                txid,
+                proof.index
+            )
+        ) {
+            revert MerkleVerifyFail();
+        }
+    }
+
+    function _finalizeWithdraw(
+        bytes16 graphId,
+        BitvmTxParser.BitcoinTx calldata rawTakeTx,
+        MerkleProof.BitcoinTxProof calldata takeProof,
+        bytes32 expectedTxid,
+        bool happyPath
+    ) internal {
+        WithdrawData storage withdrawData = withdrawDataMap[graphId];
+        bytes16 instanceId = withdrawData.instanceId;
+        PeginDataInner storage peginData = peginDataMap[instanceId];
+        if (withdrawData.status != WithdrawStatus.Processing)
+            revert WithdrawStatusInvalid();
+
+        bytes32 takeTxid = BitvmTxParser.computeTxid(rawTakeTx);
+        if (takeTxid != expectedTxid) revert TxidMismatch();
+        _verifyMerkleInclusion(takeProof, takeTxid, false);
+
+        peginData.status = PeginStatus.Claimed;
+        withdrawData.status = WithdrawStatus.Complete;
+
+        uint64 rewardAmountSats = _operatorReward(peginData.peginAmountSats);
+        pegBTC.transfer(
+            withdrawData.operatorAddress,
+            Converter.amountFromSats(rewardAmountSats)
+        );
+
+        if (happyPath) {
+            emit WithdrawHappyPath(
+                instanceId,
+                graphId,
+                takeTxid,
+                withdrawData.operatorAddress,
+                rewardAmountSats
+            );
+        } else {
+            emit WithdrawUnhappyPath(
+                instanceId,
+                graphId,
+                takeTxid,
+                withdrawData.operatorAddress,
+                rewardAmountSats
+            );
+        }
+    }
+
     modifier onlyCommittee() {
         if (!committeeManagement.isCommitteeMember(msg.sender))
             revert NotCommittee();
@@ -378,20 +455,7 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable, IGateway {
             revert PeginAmountMismatch();
 
         // validate pegin tx
-        (bytes32 blockHash, bytes32 merkleRoot) = MerkleProof
-            .parseBtcBlockHeader(peginProof.rawHeader);
-        if (bitcoinSPV.blockHash(peginProof.height) != blockHash)
-            revert InvalidHeader();
-        if (
-            !MerkleProof.verifyMerkleProof(
-                merkleRoot,
-                peginProof.proof,
-                peginTxid,
-                peginProof.index
-            )
-        ) {
-            revert MerkleVerifyFail();
-        }
+        _verifyMerkleInclusion(peginProof, peginTxid, false);
 
         // validate committeeSigs
         bytes32 pegin_digest = getPostPeginDigest(instanceId, peginTxid);
@@ -571,20 +635,7 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable, IGateway {
         GraphData storage graphData = graphDataMap[graphId];
         bytes32 kickoffTxid = BitvmTxParser.computeTxid(rawKickoffTx);
         if (kickoffTxid != graphData.kickoffTxid) revert TxidMismatch();
-        (bytes32 blockHash, bytes32 merkleRoot) = MerkleProof
-            .parseBtcBlockHeader(kickoffProof.rawHeader);
-        if (bitcoinSPV.blockHash(kickoffProof.height) != blockHash)
-            revert InvalidHeader();
-        if (
-            !MerkleProof.verifyMerkleProof(
-                merkleRoot,
-                kickoffProof.proof,
-                kickoffTxid,
-                kickoffProof.index
-            )
-        ) {
-            revert MerkleVerifyFail();
-        }
+        _verifyMerkleInclusion(kickoffProof, kickoffTxid, false);
 
         // once kickoff is braodcasted , operator will not be able to cancel withdrawal
         withdrawData.status = WithdrawStatus.Processing;
@@ -600,48 +651,13 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable, IGateway {
         BitvmTxParser.BitcoinTx calldata rawTake1Tx,
         MerkleProof.BitcoinTxProof calldata take1Proof
     ) external onlyCommittee {
-        WithdrawData storage withdrawData = withdrawDataMap[graphId];
-        bytes16 instanceId = withdrawData.instanceId;
-        PeginDataInner storage peginData = peginDataMap[instanceId];
-        if (withdrawData.status != WithdrawStatus.Processing)
-            revert WithdrawStatusInvalid();
-
         GraphData storage graphData = graphDataMap[graphId];
-        bytes32 take1Txid = BitvmTxParser.computeTxid(rawTake1Tx);
-        if (take1Txid != graphData.take1Txid) revert TxidMismatch();
-        (bytes32 blockHash, bytes32 merkleRoot) = MerkleProof
-            .parseBtcBlockHeader(take1Proof.rawHeader);
-        if (bitcoinSPV.blockHash(take1Proof.height) != blockHash)
-            revert InvalidHeader();
-        if (
-            !MerkleProof.verifyMerkleProof(
-                merkleRoot,
-                take1Proof.proof,
-                take1Txid,
-                take1Proof.index
-            )
-        ) {
-            revert MerkleVerifyFail();
-        }
-
-        peginData.status = PeginStatus.Claimed;
-        withdrawData.status = WithdrawStatus.Complete;
-
-        // incentive mechanism for honest Operators
-        uint64 rewardAmountSats = minOperatorRewardSats +
-            (peginData.peginAmountSats * operatorRewardRate) /
-            rateMultiplier;
-        pegBTC.transfer(
-            withdrawData.operatorAddress,
-            Converter.amountFromSats(rewardAmountSats)
-        );
-
-        emit WithdrawHappyPath(
-            instanceId,
+        _finalizeWithdraw(
             graphId,
-            take1Txid,
-            withdrawData.operatorAddress,
-            rewardAmountSats
+            rawTake1Tx,
+            take1Proof,
+            graphData.take1Txid,
+            true
         );
     }
 
@@ -650,48 +666,13 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable, IGateway {
         BitvmTxParser.BitcoinTx calldata rawTake2Tx,
         MerkleProof.BitcoinTxProof calldata take2Proof
     ) external onlyCommittee {
-        WithdrawData storage withdrawData = withdrawDataMap[graphId];
-        bytes16 instanceId = withdrawData.instanceId;
-        PeginDataInner storage peginData = peginDataMap[instanceId];
-        if (withdrawData.status != WithdrawStatus.Processing)
-            revert WithdrawStatusInvalid();
-
         GraphData storage graphData = graphDataMap[graphId];
-        bytes32 take2Txid = BitvmTxParser.computeTxid(rawTake2Tx);
-        if (take2Txid != graphData.take2Txid) revert TxidMismatch();
-        (bytes32 blockHash, bytes32 merkleRoot) = MerkleProof
-            .parseBtcBlockHeader(take2Proof.rawHeader);
-        if (bitcoinSPV.blockHash(take2Proof.height) != blockHash)
-            revert InvalidHeader();
-        if (
-            !MerkleProof.verifyMerkleProof(
-                merkleRoot,
-                take2Proof.proof,
-                take2Txid,
-                take2Proof.index
-            )
-        ) {
-            revert MerkleVerifyFail();
-        }
-
-        peginData.status = PeginStatus.Claimed;
-        withdrawData.status = WithdrawStatus.Complete;
-
-        // incentive mechanism for honest Operators
-        uint64 rewardAmountSats = minOperatorRewardSats +
-            (peginData.peginAmountSats * operatorRewardRate) /
-            rateMultiplier;
-        pegBTC.transfer(
-            withdrawData.operatorAddress,
-            Converter.amountFromSats(rewardAmountSats)
-        );
-
-        emit WithdrawUnhappyPath(
-            instanceId,
+        _finalizeWithdraw(
             graphId,
-            take2Txid,
-            withdrawData.operatorAddress,
-            rewardAmountSats
+            rawTake2Tx,
+            take2Proof,
+            graphData.take2Txid,
+            false
         );
     }
 
@@ -717,8 +698,6 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable, IGateway {
         address challengerAddress;
         bytes32 kickoffTxid;
         uint32 kickoffVout;
-        bytes32 blockHash;
-        bytes32 merkleRoot;
         if (
             (disproveTxType == DisproveTxType.QuickChallenge ||
                 disproveTxType == DisproveTxType.ChallengeIncompeleteKickoff) &&
@@ -735,19 +714,11 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable, IGateway {
             if (kickoffTxid != graphData.kickoffTxid) revert TxidMismatch();
             if (kickoffVout != BitvmTxParser.CHALLENGE_CONNECTOR_VOUT)
                 revert TxidMismatch();
-            (blockHash, merkleRoot) = MerkleProof.parseBtcBlockHeader(
-                challengeStartTxProof.rawHeader
+            _verifyMerkleInclusion(
+                challengeStartTxProof,
+                challengeStartTxid,
+                true
             );
-            if (bitcoinSPV.blockHash(challengeStartTxProof.height) != blockHash)
-                revert DisproveInvalidHeader();
-            if (
-                !MerkleProof.verifyMerkleProof(
-                    merkleRoot,
-                    challengeStartTxProof.proof,
-                    challengeStartTxid,
-                    challengeStartTxProof.index
-                )
-            ) revert MerkleVerifyFail();
         }
 
         // verify ChallengeFinish tx
@@ -812,19 +783,11 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable, IGateway {
         } else {
             revert UnknownDisproveType();
         }
-        (blockHash, merkleRoot) = MerkleProof.parseBtcBlockHeader(
-            challengeFinishTxProof.rawHeader
+        _verifyMerkleInclusion(
+            challengeFinishTxProof,
+            challengeFinishTxid,
+            true
         );
-        if (bitcoinSPV.blockHash(challengeFinishTxProof.height) != blockHash)
-            revert DisproveInvalidHeader();
-        if (
-            !MerkleProof.verifyMerkleProof(
-                merkleRoot,
-                challengeFinishTxProof.proof,
-                challengeFinishTxid,
-                challengeFinishTxProof.index
-            )
-        ) revert MerkleVerifyFail();
         withdrawData.status = WithdrawStatus.Disproved;
 
         // slash Operator & reward Challenger and Disprover
