@@ -68,6 +68,10 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable, IGateway {
     mapping(bytes16 graphId => GraphData) public graphDataMap;
     mapping(bytes16 graphId => WithdrawData) public withdrawDataMap;
 
+    constructor() {
+        _disableInitializers();
+    }
+
     // initializer
     function initialize(
         IPegBTC _pegBTC,
@@ -191,7 +195,7 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable, IGateway {
             );
     }
 
-    function getCancelWithdrawDigest(
+    function _getCancelWithdrawDigest(
         bytes16 graphId
     ) internal view returns (bytes32) {
         return
@@ -204,11 +208,11 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable, IGateway {
         bytes16 graphId,
         uint256 nonce
     ) public view returns (bytes32) {
-        bytes32 msgHash = getCancelWithdrawDigest(graphId);
+        bytes32 msgHash = _getCancelWithdrawDigest(graphId);
         return committeeManagement.getNoncedDigest(msgHash, nonce);
     }
 
-    function getUnlockStakeDigest(
+    function _getUnlockStakeDigest(
         address operator,
         uint256 amount
     ) internal view returns (bytes32) {
@@ -228,7 +232,7 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable, IGateway {
         uint256 amount,
         uint256 nonce
     ) public view returns (bytes32) {
-        bytes32 msgHash = getUnlockStakeDigest(operator, amount);
+        bytes32 msgHash = _getUnlockStakeDigest(operator, amount);
         return committeeManagement.getNoncedDigest(msgHash, nonce);
     }
 
@@ -277,7 +281,7 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable, IGateway {
         if (withdrawData.status != WithdrawStatus.Processing)
             revert WithdrawStatusInvalid();
 
-        bytes32 takeTxid = BitvmTxParser.computeTxid(rawTakeTx);
+        bytes32 takeTxid = BitvmTxParser._computeTxid(rawTakeTx);
         if (takeTxid != expectedTxid) revert TxidMismatch();
         _verifyMerkleInclusion(takeProof, takeTxid, false);
 
@@ -287,7 +291,7 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable, IGateway {
         uint64 rewardAmountSats = _operatorReward(peginData.peginAmountSats);
         pegBTC.transfer(
             withdrawData.operatorAddress,
-            Converter.amountFromSats(rewardAmountSats)
+            Converter._amountFromSats(rewardAmountSats)
         );
 
         if (happyPath) {
@@ -331,6 +335,7 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable, IGateway {
         string calldata userChangeAddress,
         string calldata userRefundAddress
     ) external payable {
+        // TODO: check if request already exists
         PeginDataInner storage peginData = peginDataMap[instanceId];
         if (peginData.status != PeginStatus.None) revert InstanceUsed();
         // TODO: check peginAmount,feeRate,userInputs
@@ -449,7 +454,7 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable, IGateway {
             uint64 peginAmountSats,
             address depositorAddress,
             bytes16 parsedInstanceId
-        ) = BitvmTxParser.parsePegin(rawPeginTx);
+        ) = BitvmTxParser._parsePegin(rawPeginTx);
         if (parsedInstanceId != instanceId) revert InstanceMismatch();
         if (peginAmountSats != peginData.peginAmountSats)
             revert PeginAmountMismatch();
@@ -481,9 +486,9 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable, IGateway {
         if (feeAmountSats >= peginAmountSats) revert FeeTooHigh();
         pegBTC.mint(
             depositorAddress,
-            Converter.amountFromSats(peginAmountSats - feeAmountSats)
+            Converter._amountFromSats(peginAmountSats - feeAmountSats)
         );
-        pegBTC.mint(address(this), Converter.amountFromSats(feeAmountSats));
+        pegBTC.mint(address(this), Converter._amountFromSats(feeAmountSats));
 
         emit BridgeIn(
             depositorAddress,
@@ -554,7 +559,7 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable, IGateway {
         peginData.status = PeginStatus.Locked;
 
         // lock operator's pegBTC
-        uint256 lockAmount = Converter.amountFromSats(
+        uint256 lockAmount = Converter._amountFromSats(
             peginData.peginAmountSats
         );
         pegBTC.transferFrom(msg.sender, address(this), lockAmount);
@@ -588,6 +593,7 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable, IGateway {
             revert TimelockNotExpired();
         }
         withdrawData.status = WithdrawStatus.Canceled;
+        // FIXME: transfer to operator or gateway?
         pegBTC.transfer(msg.sender, withdrawData.lockAmount);
         peginData.status = PeginStatus.Withdrawbale;
 
@@ -601,7 +607,7 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable, IGateway {
     ) external {
         // validate committeeSigs
         WithdrawData storage withdrawData = withdrawDataMap[graphId];
-        bytes32 cancel_digest = getCancelWithdrawDigest(graphId);
+        bytes32 cancel_digest = _getCancelWithdrawDigest(graphId);
         committeeManagement.executeNoncedSignatures(
             cancel_digest,
             nonce,
@@ -614,6 +620,7 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable, IGateway {
         if (withdrawData.status != WithdrawStatus.Initialized)
             revert WithdrawStatusInvalid();
         withdrawData.status = WithdrawStatus.Canceled;
+        // FIXME: transfer to operator or gateway?
         pegBTC.transfer(msg.sender, withdrawData.lockAmount);
         peginData.status = PeginStatus.Withdrawbale;
         emit CancelWithdraw(withdrawData.instanceId, graphId, msg.sender);
@@ -633,7 +640,7 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable, IGateway {
             revert KickoffHeightLow();
 
         GraphData storage graphData = graphDataMap[graphId];
-        bytes32 kickoffTxid = BitvmTxParser.computeTxid(rawKickoffTx);
+        bytes32 kickoffTxid = BitvmTxParser._computeTxid(rawKickoffTx);
         if (kickoffTxid != graphData.kickoffTxid) revert TxidMismatch();
         _verifyMerkleInclusion(kickoffProof, kickoffTxid, false);
 
@@ -710,7 +717,7 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable, IGateway {
                 kickoffTxid,
                 kickoffVout,
                 challengerAddress
-            ) = BitvmTxParser.parseChallengeTx(rawChallengeStartTx);
+            ) = BitvmTxParser._parseChallengeTx(rawChallengeStartTx);
             if (kickoffTxid != graphData.kickoffTxid) revert TxidMismatch();
             if (kickoffVout != BitvmTxParser.CHALLENGE_CONNECTOR_VOUT)
                 revert TxidMismatch();
@@ -725,7 +732,7 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable, IGateway {
         bytes32 challengeFinishTxid;
         address disproverAddress;
         if (disproveTxType == DisproveTxType.AssertTimeout) {
-            (challengeFinishTxid) = BitvmTxParser.computeTxid(
+            (challengeFinishTxid) = BitvmTxParser._computeTxid(
                 rawChallengeFinishTx
             );
             if (graphData.assertTimoutTxids.length <= txnIndex)
@@ -733,13 +740,13 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable, IGateway {
             if (challengeFinishTxid != graphData.assertTimoutTxids[txnIndex])
                 revert TxidMismatch();
         } else if (disproveTxType == DisproveTxType.OperatorCommitTimeout) {
-            (challengeFinishTxid) = BitvmTxParser.computeTxid(
+            (challengeFinishTxid) = BitvmTxParser._computeTxid(
                 rawChallengeFinishTx
             );
             if (challengeFinishTxid != graphData.commitTimoutTxid)
                 revert TxidMismatch();
         } else if (disproveTxType == DisproveTxType.OperatorNack) {
-            (challengeFinishTxid) = BitvmTxParser.computeTxid(
+            (challengeFinishTxid) = BitvmTxParser._computeTxid(
                 rawChallengeFinishTx
             );
             if (graphData.NackTxids.length <= txnIndex)
@@ -752,7 +759,7 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable, IGateway {
                 kickoffTxid,
                 kickoffVout,
                 disproverAddress
-            ) = BitvmTxParser.parseDisproveTx(rawChallengeFinishTx);
+            ) = BitvmTxParser._parseDisproveTx(rawChallengeFinishTx);
             if (kickoffTxid != graphData.kickoffTxid) revert TxidMismatch();
             if (kickoffVout != BitvmTxParser.DISPROVE_CONNECTOR_VOUT)
                 revert TxidMismatch();
@@ -762,7 +769,7 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable, IGateway {
                 kickoffTxid,
                 kickoffVout,
                 disproverAddress
-            ) = BitvmTxParser.parseQuickChallengeTx(rawChallengeFinishTx);
+            ) = BitvmTxParser._parseQuickChallengeTx(rawChallengeFinishTx);
             if (kickoffTxid != graphData.kickoffTxid) revert TxidMismatch();
             if (kickoffVout != BitvmTxParser.GUARDIAN_CONNECTOR_VOUT)
                 revert TxidMismatch();
@@ -774,7 +781,7 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable, IGateway {
                 kickoffTxid,
                 kickoffVout,
                 disproverAddress
-            ) = BitvmTxParser.parseChallengeIncompleteKickoffTx(
+            ) = BitvmTxParser._parseChallengeIncompleteKickoffTx(
                     rawChallengeFinishTx
                 );
             if (kickoffTxid != graphData.kickoffTxid) revert TxidMismatch();
@@ -835,7 +842,7 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable, IGateway {
         uint256 nonce,
         bytes[] calldata committeeSigs
     ) external {
-        bytes32 msgHash = getUnlockStakeDigest(operator, amount);
+        bytes32 msgHash = _getUnlockStakeDigest(operator, amount);
         committeeManagement.executeNoncedSignatures(
             msgHash,
             nonce,

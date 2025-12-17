@@ -16,8 +16,8 @@ library MerkleProof {
         pure
         returns (bytes32 blockHash, bytes32 merkleRoot)
     {
-        blockHash = BitvmTxParser.hash256(rawHeader);
-        merkleRoot = BitvmTxParser.memLoad(rawHeader, 0x44);
+        blockHash = BitvmTxParser._hash256(rawHeader);
+        merkleRoot = BitvmTxParser._memLoad(rawHeader, 0x44);
     }
 
     function verifyMerkleProof(bytes32 root, bytes32[] memory proof, bytes32 leaf, uint256 index)

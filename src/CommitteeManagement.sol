@@ -183,7 +183,7 @@ contract CommitteeManagement is MultiSigVerifier {
         uint256 nonce,
         bytes[] memory authSignatures
     ) external {
-        bytes32 msgHash = getAddWatchtowerDigest(watchtower);
+        bytes32 msgHash = _getAddWatchtowerDigest(watchtower);
         _executeNoncedSignatures(msgHash, nonce, authSignatures);
         watchtowerList.add(watchtower);
     }
@@ -194,14 +194,14 @@ contract CommitteeManagement is MultiSigVerifier {
         uint256 nonce,
         bytes[] memory authSignatures
     ) external {
-        bytes32 msgHash = getRemoveWatchtowerDigest(watchtower);
+        bytes32 msgHash = _getRemoveWatchtowerDigest(watchtower);
         _executeNoncedSignatures(msgHash, nonce, authSignatures);
         watchtowerList.remove(watchtower);
     }
 
     // ========== Digest Helpers (Watchtower) ==========
     /// @dev Returns the domain-bound message hash for adding a watchtower (without nonce)
-    function getAddWatchtowerDigest(
+    function _getAddWatchtowerDigest(
         bytes32 watchtower
     ) internal view returns (bytes32) {
         bytes32 typeHash = keccak256("ADD_WATCHTOWER(bytes32 watchtower)");
@@ -213,12 +213,12 @@ contract CommitteeManagement is MultiSigVerifier {
         bytes32 watchtower,
         uint256 nonce
     ) public view returns (bytes32) {
-        bytes32 msgHash = getAddWatchtowerDigest(watchtower);
+        bytes32 msgHash = _getAddWatchtowerDigest(watchtower);
         return getNoncedDigest(msgHash, nonce);
     }
 
     /// @dev Returns the domain-bound message hash for removing a watchtower (without nonce)
-    function getRemoveWatchtowerDigest(
+    function _getRemoveWatchtowerDigest(
         bytes32 watchtower
     ) internal view returns (bytes32) {
         bytes32 typeHash = keccak256("REMOVE_WATCHTOWER(bytes32 watchtower)");
@@ -230,7 +230,7 @@ contract CommitteeManagement is MultiSigVerifier {
         bytes32 watchtower,
         uint256 nonce
     ) public view returns (bytes32) {
-        bytes32 msgHash = getRemoveWatchtowerDigest(watchtower);
+        bytes32 msgHash = _getRemoveWatchtowerDigest(watchtower);
         return getNoncedDigest(msgHash, nonce);
     }
 
@@ -264,7 +264,7 @@ contract CommitteeManagement is MultiSigVerifier {
         uint256 nonce,
         bytes[] memory authSignatures
     ) external {
-        bytes32 msgHash = getAddAuthorizedCallerDigest(caller);
+        bytes32 msgHash = _getAddAuthorizedCallerDigest(caller);
         _executeNoncedSignatures(msgHash, nonce, authSignatures);
         authorizedCallers.add(caller);
         emit AuthorizedCallerAdded(caller);
@@ -276,7 +276,7 @@ contract CommitteeManagement is MultiSigVerifier {
         uint256 nonce,
         bytes[] memory authSignatures
     ) external {
-        bytes32 msgHash = getRemoveAuthorizedCallerDigest(caller);
+        bytes32 msgHash = _getRemoveAuthorizedCallerDigest(caller);
         _executeNoncedSignatures(msgHash, nonce, authSignatures);
         authorizedCallers.remove(caller);
         emit AuthorizedCallerRemoved(caller);
@@ -284,7 +284,7 @@ contract CommitteeManagement is MultiSigVerifier {
 
     // ========== Digest Helpers (Authorized Callers) ==========
     /// @dev Returns the domain-bound message hash for adding an authorized external caller (without nonce)
-    function getAddAuthorizedCallerDigest(
+    function _getAddAuthorizedCallerDigest(
         address caller
     ) internal view returns (bytes32) {
         bytes32 typeHash = keccak256("ADD_AUTH_CALLER(address caller)");
@@ -296,12 +296,12 @@ contract CommitteeManagement is MultiSigVerifier {
         address caller,
         uint256 nonce
     ) public view returns (bytes32) {
-        bytes32 msgHash = getAddAuthorizedCallerDigest(caller);
+        bytes32 msgHash = _getAddAuthorizedCallerDigest(caller);
         return getNoncedDigest(msgHash, nonce);
     }
 
     /// @dev Returns the domain-bound message hash for removing an authorized external caller (without nonce)
-    function getRemoveAuthorizedCallerDigest(
+    function _getRemoveAuthorizedCallerDigest(
         address caller
     ) internal view returns (bytes32) {
         bytes32 typeHash = keccak256("REMOVE_AUTH_CALLER(address caller)");
@@ -313,7 +313,7 @@ contract CommitteeManagement is MultiSigVerifier {
         address caller,
         uint256 nonce
     ) public view returns (bytes32) {
-        bytes32 msgHash = getRemoveAuthorizedCallerDigest(caller);
+        bytes32 msgHash = _getRemoveAuthorizedCallerDigest(caller);
         return getNoncedDigest(msgHash, nonce);
     }
 
