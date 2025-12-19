@@ -47,8 +47,8 @@ contract StakeManagement is IStakeManagement, Initializable {
         return lockedStakes[operator];
     }
 
-    // TODO: add caller authentication?
     function slashStake(address operator, uint256 amount) external override {
+        require(msg.sender == gatewayAddress, "only gateway can slash stake");
         require(stakes[operator] >= amount, "insufficient stake to slash");
         if (lockedStakes[operator] > amount) {
             lockedStakes[operator] -= amount;
