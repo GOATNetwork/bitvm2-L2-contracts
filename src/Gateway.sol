@@ -25,10 +25,10 @@ contract BitvmPolicy {
     uint64 public minOperatorRewardSats;
     uint64 public operatorRewardRate;
 
-    uint64 public minStakeAmount; // TODO: uint256
-    uint64 public minChallengerReward; // TODO: uint256
-    uint64 public minDisproverReward; // TODO: uint256
-    uint64 public minSlashAmount; // TODO: uint256
+    uint256 public minStakeAmount; 
+    uint256 public minChallengerReward; 
+    uint256 public minDisproverReward; 
+    uint256 public minSlashAmount; 
 
     // TODO Initializer & setters
 }
@@ -335,7 +335,6 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable, IGateway {
         string calldata userChangeAddress,
         string calldata userRefundAddress
     ) external payable {
-        // TODO: check if request already exists
         PeginDataInner storage peginData = peginDataMap[instanceId];
         if (peginData.status != PeginStatus.None) revert InstanceUsed();
         // TODO: check peginAmount,feeRate,userInputs
@@ -593,11 +592,10 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable, IGateway {
             revert TimelockNotExpired();
         }
         withdrawData.status = WithdrawStatus.Canceled;
-        // FIXME: transfer to operator or gateway?
-        pegBTC.transfer(msg.sender, withdrawData.lockAmount);
+        pegBTC.transfer(withdrawData.operatorAddress, withdrawData.lockAmount);
         peginData.status = PeginStatus.Withdrawbale;
 
-        emit CancelWithdraw(withdrawData.instanceId, graphId, msg.sender);
+        emit CancelWithdraw(withdrawData.instanceId, graphId, withdrawData.operatorAddress);
     }
 
     function committeeCancelWithdraw(
@@ -620,10 +618,9 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable, IGateway {
         if (withdrawData.status != WithdrawStatus.Initialized)
             revert WithdrawStatusInvalid();
         withdrawData.status = WithdrawStatus.Canceled;
-        // FIXME: transfer to operator or gateway?
-        pegBTC.transfer(msg.sender, withdrawData.lockAmount);
+        pegBTC.transfer(withdrawData.operatorAddress, withdrawData.lockAmount);
         peginData.status = PeginStatus.Withdrawbale;
-        emit CancelWithdraw(withdrawData.instanceId, graphId, msg.sender);
+        emit CancelWithdraw(withdrawData.instanceId, graphId, withdrawData.operatorAddress);
     }
 
     // post kickoff tx
@@ -807,8 +804,8 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable, IGateway {
         if (operatorStake < slashAmount) slashAmount = operatorStake;
         stakeManagement.slashStake(operatorStakeAddress, slashAmount);
 
-        uint64 challengerRewardAmount = minChallengerReward;
-        uint64 disproverRewardAmount = minDisproverReward;
+        uint256 challengerRewardAmount = minChallengerReward;
+        uint256 disproverRewardAmount = minDisproverReward;
         if (challengerAddress != address(0)) {
             stakeToken.transfer(challengerAddress, challengerRewardAmount);
         }

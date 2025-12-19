@@ -187,7 +187,7 @@ interface IGateway {
         bytes32 challengeFinishTxid,
         address challengerAddress,
         address disproverAddress,
-        uint64 challengerRewardAmount,
-        uint64 disproverRewardAmount
+        uint256 challengerRewardAmount,
+        uint256 disproverRewardAmount
     );
 }
