@@ -54,6 +54,8 @@ contract DeployGateway is Script {
         bytes32[] memory initialWatchtowers = _readSequentialBytes32(
             "WATCHTOWER"
         );
+        require(initialMembers.length > 0, "COMMITTEE list empty");
+        require(initialWatchtowers.length > 0, "WATCHTOWER list empty");
         address[] memory initialAuthorizedCallers = new address[](1);
         initialAuthorizedCallers[0] = address(gateway);
 
@@ -62,23 +64,21 @@ contract DeployGateway is Script {
             "CommitteeManagement implementation contract address: ",
             address(committeeImpl)
         );
-        UpgradeableProxy committeeProxy = new UpgradeableProxy(
-            address(committeeImpl),
-            deployer,
-            ""
-        );
-        console.log(
-            "CommitteeManagement proxy contract address: ",
-            address(committeeProxy)
-        );
-        CommitteeManagement committeeManagementImpl = CommitteeManagement(
-            address(committeeProxy)
-        );
-        committeeManagementImpl.initialize(
+        bytes memory committeeInitData = abi.encodeWithSelector(
+            CommitteeManagement.initialize.selector,
             initialMembers,
             initialRequired,
             initialAuthorizedCallers,
             initialWatchtowers
+        );
+        UpgradeableProxy committeeProxy = new UpgradeableProxy(
+            address(committeeImpl),
+            deployer,
+            committeeInitData
+        );
+        console.log(
+            "CommitteeManagement proxy contract address: ",
+            address(committeeProxy)
         );
         ICommitteeManagement committeeManagement = ICommitteeManagement(
             address(committeeProxy)
@@ -89,21 +89,19 @@ contract DeployGateway is Script {
             "StakeManagement implementation contract address: ",
             address(stakeImpl)
         );
+        bytes memory stakeInitData = abi.encodeWithSelector(
+            StakeManagement.initialize.selector,
+            IERC20(address(pegBTC)),
+            address(gateway)
+        );
         UpgradeableProxy stakeProxy = new UpgradeableProxy(
             address(stakeImpl),
             deployer,
-            ""
+            stakeInitData
         );
         console.log(
             "StakeManagement proxy contract address: ",
             address(stakeProxy)
-        );
-        StakeManagement stakeManagementImpl = StakeManagement(
-            address(stakeProxy)
-        );
-        stakeManagementImpl.initialize(
-            IERC20(address(pegBTC)),
-            address(gateway)
         );
         IStakeManagement stakeManagement = IStakeManagement(
             address(stakeProxy)

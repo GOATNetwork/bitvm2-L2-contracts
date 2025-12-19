@@ -132,9 +132,7 @@ contract MultiSigVerifier is Initializable {
         for (uint256 i = 0; i < newOwners.length; i++) {
             address o = newOwners[i];
             require(o != address(0), "Zero address");
-            for (uint256 j = 0; j < i; j++) {
-                require(newOwners[j] != o, "Duplicate owner");
-            }
+            require(!isOwner[o], "Duplicate owner");
             isOwner[o] = true;
             ownerList.push(o);
         }

@@ -1,13 +1,26 @@
-# Deploy
+# Deployment Scripts
 
+## Environment setup
 
+1. Copy `.env.example` to `.env` and replace the placeholder values.
+2. Add as many `COMMITTEE_<index>` and `WATCHTOWER_<index>` entries as needed. Indexes must be sequential (e.g., `_0`, `_1`, `_2`).
+3. Export the variables into your shell (`set -a && source .env && set +a`) or let Foundry load them via `--env .env`.
+
+## Deploying the Gateway stack
+
+The `DeployGateway` script provisions the PegBTC token, Gateway (implementation + proxy), CommitteeManagement proxy, and StakeManagement proxy. Each proxy is initialized via constructor-calldata so there is no uninitialized window.
+
+```bash
+make deployTest
+# or for mainnet
+make deployMain
 ```
-export prv=...
-export OWNER=0x8943545177806ED17B9F23F0a21ee5948eCaa776
 
-forge script script/SSPDeploy.s.sol:Deploy \
-    --rpc-url https://rpc.testnet3.goat.network --private-key=$prv --broadcast --legacy
+Under the hood these targets expand to `forge script script/DeployGateway.sol:DeployGateway` with the Goat RPC aliases defined in `foundry.toml`, `--broadcast -vvvv`, and Blockscout verification flags (`--verifier blockscout --verifier-url ...). Provide `PRIVATE_KEY`, `BITCOINSPV_ADDR`, committee, and watchtower env vars before invoking the Makefile.
 
-forge verify-contract --compiler-version 0.8.28 0x3901C4670aA92a626636f7Ea1e3F029A0ECd6b68 SequencerSetPublisher --verifier blockscout --verifier-url 'https://explorer.testnet3.goat.network/api/'
+Key environment variables consumed by the script:
 
-```
+- `PRIVATE_KEY`: broadcaster key (hex string, no quotes).
+- `BITCOINSPV_ADDR`: already deployed Bitcoin SPV contract on the target chain.
+- `COMMITTEE_<i>`: sequential list of committee member addresses (at least one required).
+- `WATCHTOWER_<i>`: sequential list of 32-byte watchtower identifiers (at least one required).
