@@ -12,11 +12,15 @@ The `DeployGateway` script provisions the PegBTC token, Gateway (implementation 
 
 ```bash
 make deployTest
-# or for mainnet
+```
+
+or for mainnet
+
+```bash
 make deployMain
 ```
 
-Under the hood these targets expand to `forge script script/DeployGateway.sol:DeployGateway` with the Goat RPC aliases defined in `foundry.toml`, `--broadcast -vvvv`, and Blockscout verification flags (`--verifier blockscout --verifier-url ...). Provide `PRIVATE_KEY`, `BITCOINSPV_ADDR`, committee, and watchtower env vars before invoking the Makefile.
+Under the hood these targets expand to `forge script script/DeployGateway.sol:DeployGateway` with the Goat RPC aliases defined in `foundry.toml`, `--broadcast -vvvv`, and Blockscout verification flags (`--verifier blockscout --verifier-url ...`). Provide `PRIVATE_KEY`, `BITCOINSPV_ADDR`, committee, and watchtower env vars before invoking the Makefile.
 
 Key environment variables consumed by the script:
 
