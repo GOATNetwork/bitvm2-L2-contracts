@@ -8,23 +8,28 @@
 
 ## Deploying the Gateway stack
 
-The `DeployGateway` script provisions the PegBTC token, Gateway (implementation + proxy), CommitteeManagement proxy, and StakeManagement proxy. Each proxy is initialized via constructor-calldata so there is no uninitialized window.
+All deployment scripts now live under `script/deploy/` and each script focuses on a single contract. Run them in the order below, updating your `.env` with the emitted addresses between steps:
+
+1. **Gateway proxy** – `script/deploy/DeployGateway.sol:DeployGateway`
+2. **PegBTC token** – `script/deploy/DeployPegBTC.sol:DeployPegBTC`
+3. **CommitteeManagement proxy** – `script/deploy/DeployCommitteeManagement.sol:DeployCommitteeManagement`
+4. **StakeManagement proxy** – `script/deploy/DeployStakeManagement.sol:DeployStakeManagement`
+5. **Gateway init via constructor data** – rerun the Gateway deploy script once `PEGBTC_ADDR`, `BITCOINSPV_ADDR`, `COMMITTEE_PROXY_ADDR`, and `STAKE_PROXY_ADDR` are known so that the proxy is deployed with the correct initializer calldata.
+
+Example command:
 
 ```bash
-make deployTest
+forge script script/deploy/DeployGateway.sol:DeployGateway \
+  --rpc-url goatTestnet \
+  --broadcast -vvvv \
+  --verify --verifier blockscout \
+  --verifier-url https://explorer.testnet3.goat.network/api/
 ```
 
-or for mainnet
-
-```bash
-make deployMain
-```
-
-Under the hood these targets expand to `forge script script/DeployGateway.sol:DeployGateway` with the Goat RPC aliases defined in `foundry.toml`, `--broadcast -vvvv`, and Blockscout verification flags (`--verifier blockscout --verifier-url ...`). Provide `PRIVATE_KEY`, `BITCOINSPV_ADDR`, committee, and watchtower env vars before invoking the Makefile.
-
-Key environment variables consumed by the script:
+Repeat the command with the appropriate script name (and `goatMainnet` when deploying to mainnet). Required environment variables grow as you progress:
 
 - `PRIVATE_KEY`: broadcaster key (hex string, no quotes).
-- `BITCOINSPV_ADDR`: already deployed Bitcoin SPV contract on the target chain.
-- `COMMITTEE_<i>`: sequential list of committee member addresses (at least one required).
-- `WATCHTOWER_<i>`: sequential list of 32-byte watchtower identifiers (at least one required).
+- `BITCOINSPV_ADDR`: previously deployed Bitcoin SPV contract.
+- `GATEWAY_PROXY_ADDR`: emitted when deploying the gateway proxy (needed by PegBTC + Committee scripts).
+- `PEGBTC_ADDR`, `COMMITTEE_PROXY_ADDR`, `STAKE_PROXY_ADDR`: used by the Gateway deploy script when encoding initializer calldata.
+- `COMMITTEE_<i>` / `WATCHTOWER_<i>`: sequential committee + watchtower definitions for the committee deploy script.
