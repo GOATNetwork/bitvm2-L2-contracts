@@ -14,6 +14,12 @@ import {PegBTC} from "../src/PegBTC.sol";
 import {UpgradeableProxy} from "../src/UpgradeableProxy.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
+/*
+    Script: Deploy the GatewayDebug contract and related contracts.
+    Required env vars:
+    - PRIVATE_KEY:      uint256 private key to broadcast from (deployer)
+    - BITCOINSPV_ADDR:  address of the BitcoinSPV contract
+*/
 contract DeployGateway is Script {
     address public deployer;
     address public bitcoinSPV;

@@ -6,6 +6,11 @@ import {console} from "forge-std/console.sol";
 import {SequencerSetPublisher} from "../src/SequencerSetPublisher.sol";
 import {MultiSigVerifier} from "../src/MultiSigVerifier.sol";
 
+/*
+    Script: Deploy SequencerSetPublisher and MultiSigVerifier.
+    Required env vars:
+    - OWNER: address of the initial owner
+*/
 contract Deploy is Script {
     function run() external {
         // Load from environment variables or replace inline
