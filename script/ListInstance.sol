@@ -5,6 +5,15 @@ import {Script, console} from "forge-std/Script.sol";
 import {GatewayUpgradeable} from "../src/Gateway.sol";
 import {IGateway} from "../src/interfaces/IGateway.sol";
 
+/*
+    Script: List instances from the Gateway.
+    Required env vars:
+    - GATEWAY_ADDR:           address of deployed Gateway (proxy)
+    - START_INDEX:            (optional) uint256 start index for listing (default: 0)
+    - END_INDEX:              (optional) uint256 end index for listing (default: max)
+    - FILTER_PEGIN_STATUS:    (optional) int256 filter by pegin status (default: -1 for all)
+    - FILTER_WITHDRAW_STATUS: (optional) int256 filter by withdraw status (default: -1 for all)
+*/
 contract DebugListInstance is Script {
     GatewayUpgradeable gateway;
     int256 filterPeginStatus;

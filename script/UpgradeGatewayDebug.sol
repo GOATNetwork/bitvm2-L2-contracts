@@ -5,6 +5,13 @@ import {GatewayDebug} from "../src/GatewayDebug.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
+/*
+    Script: Upgrade the Gateway contract to GatewayDebug.
+    Required env vars:
+    - PRIVATE_KEY:      uint256 private key to broadcast from (sender)
+    - PROXYADMIN_ADDR:  address of the ProxyAdmin contract
+    - GATEWAY_ADDR:     address of the Gateway proxy
+*/
 contract UpgradeGateway is Script {
     address public sender;
     address public proxyAdmin;
