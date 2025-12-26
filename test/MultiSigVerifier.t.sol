@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import "forge-std/Test.sol";
-import "../src/MultiSigVerifier.sol";
-import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
+import {Test} from "forge-std/Test.sol";
+import {MultiSigVerifier} from "../src/MultiSigVerifier.sol";
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {
+    MessageHashUtils
+} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 
 contract MultiSigVerifierTest is Test {
     using ECDSA for bytes32;
@@ -32,7 +34,8 @@ contract MultiSigVerifierTest is Test {
         message = keccak256("hello world").toEthSignedMessageHash();
 
         // Require at least 2 signatures
-        verifier = new MultiSigVerifier(owners, 2);
+        verifier = new MultiSigVerifier();
+        verifier.initialize(owners, 2);
     }
 
     function testVerifyWithEnoughSignatures() public view {
@@ -74,12 +77,15 @@ contract MultiSigVerifierTest is Test {
         assertFalse(ok, "Non-owner signature should not be valid");
     }
 
-    function _signUpdate(uint256 privKey, address[] memory newOwners, uint256 newRequired, uint256 nonce)
-        internal
-        pure
-        returns (bytes memory sig)
-    {
-        bytes32 digest = keccak256(abi.encodePacked(nonce, newOwners, newRequired));
+    function _signUpdate(
+        uint256 privKey,
+        address[] memory newOwners,
+        uint256 newRequired,
+        uint256 nonce
+    ) internal pure returns (bytes memory sig) {
+        bytes32 digest = keccak256(
+            abi.encodePacked(nonce, newOwners, newRequired)
+        );
 
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(privKey, digest);
         sig = abi.encodePacked(r, s, v);

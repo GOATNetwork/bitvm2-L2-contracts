@@ -84,12 +84,6 @@ contract CommitteeManagementDebug is CommitteeManagement {
     using EnumerableSet for EnumerableSet.AddressSet;
     using EnumerableSet for EnumerableSet.Bytes32Set;
 
-    constructor(
-        address[] memory initialMembers,
-        uint256 initialRequired,
-        address[] memory initialAuthorizedCallers,
-        bytes32[] memory initialWatchtowers
-    ) CommitteeManagement(initialMembers, initialRequired, initialAuthorizedCallers, initialWatchtowers) {}
 
     modifier onlyCommittee() {
         require(isOwner[msg.sender], "only committee member can call");

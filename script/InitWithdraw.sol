@@ -42,7 +42,7 @@ contract InitWithdraw is Script {
         // Read pegin data to compute the exact lock amount in PegBTC
         GatewayUpgradeable.PeginData memory pegin = gateway.getPeginData(instanceId);
         require(pegin.peginAmountSats > 0, "pegin not found or amount=0");
-        uint256 lockAmount = Converter.amountFromSats(pegin.peginAmountSats);
+        uint256 lockAmount = Converter._amountFromSats(pegin.peginAmountSats);
 
         // derive sender address from private key in a view-only way
         address operator = vm.addr(pk);
