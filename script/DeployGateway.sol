@@ -9,13 +9,13 @@ import {StakeManagement} from "../src/StakeManagement.sol";
 import {ICommitteeManagement} from "../src/interfaces/ICommitteeManagement.sol";
 import {IStakeManagement} from "../src/interfaces/IStakeManagement.sol";
 
-import {GatewayDebug, CommitteeManagementDebug} from "../src/GatewayDebug.sol";
+import {GatewayUpgradeable} from "../src/Gateway.sol";
 import {PegBTC} from "../src/PegBTC.sol";
 import {UpgradeableProxy} from "../src/UpgradeableProxy.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /*
-    Script: Deploy the GatewayDebug contract and related contracts.
+    Script: Deploy the Gateway contract and related contracts.
     Required env vars:
     - PRIVATE_KEY:      uint256 private key to broadcast from (deployer)
     - BITCOINSPV_ADDR:  address of the BitcoinSPV contract
@@ -38,7 +38,8 @@ contract DeployGateway is Script {
     }
 
     function deploy() public {
-        GatewayDebug gatewayImpl = new GatewayDebug();
+        // deploy gateway implementation + proxy
+        GatewayUpgradeable gatewayImpl = new GatewayUpgradeable();
         console.log(
             "Gateway implementation contract address: ",
             address(gatewayImpl)
@@ -50,11 +51,12 @@ contract DeployGateway is Script {
             ""
         );
         console.log("Gateway proxy contract address: ", address(gatewayProxy));
-        GatewayDebug gateway = GatewayDebug(payable(gatewayProxy));
+        GatewayUpgradeable gateway = GatewayUpgradeable(payable(gatewayProxy));
 
         PegBTC pegBTC = new PegBTC(address(gateway));
         console.log("PegBTC contract address: ", address(pegBTC));
 
+        // Read committee config from env
         address[] memory initialMembers = _readSequentialAddresses("COMMITTEE");
         uint256 initialRequired = (initialMembers.length * 2 + 2) / 3;
         bytes32[] memory initialWatchtowers = _readSequentialBytes32(
@@ -65,7 +67,8 @@ contract DeployGateway is Script {
         address[] memory initialAuthorizedCallers = new address[](1);
         initialAuthorizedCallers[0] = address(gateway);
 
-        CommitteeManagementDebug committeeImpl = new CommitteeManagementDebug();
+        // Deploy CommitteeManagement implementation + proxy
+        CommitteeManagement committeeImpl = new CommitteeManagement();
         console.log(
             "CommitteeManagement implementation contract address: ",
             address(committeeImpl)
@@ -90,6 +93,7 @@ contract DeployGateway is Script {
             address(committeeProxy)
         );
 
+        // Deploy StakeManagement implementation + proxy
         StakeManagement stakeImpl = new StakeManagement();
         console.log(
             "StakeManagement implementation contract address: ",

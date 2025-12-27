@@ -37,13 +37,10 @@ contract DeploySequencerSetPublisher is Script {
         vm.startBroadcast();
 
         SequencerSetPublisher publisher = new SequencerSetPublisher();
-        MultiSigVerifier multiSigVerifier = new MultiSigVerifier();
+        // MultiSigVerifier multiSigVerifier = new MultiSigVerifier();
 
         publisher.initialize(
-            initialOwner,
-            address(multiSigVerifier),
-            initPublishers,
-            initPublisherBTCPubkeys
+            initialOwner
         );
 
         vm.stopBroadcast();
