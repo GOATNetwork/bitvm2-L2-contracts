@@ -2,31 +2,21 @@
 pragma solidity ^0.8.28;
 
 interface ISequencerSetPublisher {
-    struct SequencerSet {
-        bytes32 sequencerSetHash; // validator_hash
-        bytes32 publishersHash;
-        bytes32 nextPublishersHash;
-        bytes32 p2wshSigHash; // anchor the BTC txn
-        uint256 goatBlockNumber;
+    error DoubleCommit();
+    error InvalidBtcSignature();
+    error InvalidBtcPubkey();
+    error InvalidPubkeyLength();
+    error InvalidPublicKeyX();
+    error ModexpFailed();
+
+    struct SequencerSetUpdateWitness {
+        bytes32 sigHash;
+        bytes btcPubkey;
+        bytes btcSig;
     }
 
-    error P2WSHSignatureMismatch();
-    error DoubleCommit();
-    error InvalidSequencerSet();
-    error InvalidQuorumSequencerSet();
-    error MismatchPublisher();
-    error InvalidPublisherSet();
-    error InvalidGOATHeight();
-    error k256Decompress_Invalid_Length_Error();
-    error k256DeriveY_Invalid_Prefix_Error();
-
-    function updateSequencerSet(SequencerSet calldata ss, bytes calldata signature) external;
-
-    // Update publisher at once by multi-sig
-    function updatePublisherSet(
-        address[] calldata newPublishers,
-        bytes[] calldata newPublisherBTCPubkeys,
-        bytes[] calldata changePublisherSigs,
-        uint256 height
+    function updateSequencerSet(
+        uint256 goatHeight,
+        SequencerSetUpdateWitness calldata witness
     ) external;
 }
