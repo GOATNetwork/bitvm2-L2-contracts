@@ -25,7 +25,8 @@ contract SequencerSetPublisher is
     using ECDSA for bytes32;
     using MessageHashUtils for bytes32;
 
-    mapping(uint256 height => SequencerSetUpdateWitness) public sequencerSetUpdateWitnesses;
+    mapping(uint256 height => SequencerSetUpdateWitness[]) private _sequencerSetUpdateWitnesses;
+    mapping(uint256 height => mapping(bytes32 pubkeyHash => bool)) private _hasWitness;
 
     function initialize(
         address initialOwner
@@ -40,11 +41,18 @@ contract SequencerSetPublisher is
     ) external override {
         BtcUtils.verifyBtcSignature(witness.sigHash, witness.btcPubkey, witness.btcSig);
 
-        // Avoid double commit
-        if (sequencerSetUpdateWitnesses[goatHeight].sigHash != bytes32(0)) {
+        bytes32 pubkeyHash = keccak256(witness.btcPubkey);
+        if (_hasWitness[goatHeight][pubkeyHash]) {
             revert DoubleCommit();
         }
 
-        sequencerSetUpdateWitnesses[goatHeight] = witness;
+        _hasWitness[goatHeight][pubkeyHash] = true;
+        _sequencerSetUpdateWitnesses[goatHeight].push(witness);
+    }
+
+    function getSequencerSetUpdateWitnesses(
+        uint256 goatHeight
+    ) external view override returns (SequencerSetUpdateWitness[] memory) {
+        return _sequencerSetUpdateWitnesses[goatHeight];
     }
 }

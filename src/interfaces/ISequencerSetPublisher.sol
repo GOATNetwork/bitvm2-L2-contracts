@@ -19,4 +19,8 @@ interface ISequencerSetPublisher {
         uint256 goatHeight,
         SequencerSetUpdateWitness calldata witness
     ) external;
+
+    function getSequencerSetUpdateWitnesses(
+        uint256 goatHeight
+    ) external view returns (SequencerSetUpdateWitness[] memory);
 }
