@@ -255,4 +255,44 @@ contract SequencerSetPublisherTest is Test {
             keccak256("set5")
         );
     }
+
+    function testMultipleWitnesses() public {
+        uint256 height = 100;
+        bytes32 sigHash = keccak256("commit_multi");
+        
+        // Witness 1 (pk=11)
+        run_sequencer_update_test(
+            batch, // contains 11
+            batch,
+            height,
+            sigHash,
+            bytes32(0),
+            bytes32(0)
+        );
+
+        // Witness 2 (pk=21)
+        run_sequencer_update_test(
+            batch1, // contains 21
+            batch1,
+            height,
+            sigHash,
+            bytes32(0),
+            bytes32(0)
+        );
+
+        // Check if we have 2 witnesses
+        ISequencerSetPublisher.SequencerSetUpdateWitness[] memory witnesses = sspublisher.getSequencerSetUpdateWitnesses(height);
+        assertEq(witnesses.length, 2);
+        
+        // Try adding Witness 1 again (should fail)
+        vm.expectRevert(ISequencerSetPublisher.DoubleCommit.selector);
+        run_sequencer_update_test(
+            batch,
+            batch,
+            height,
+            sigHash,
+            bytes32(0),
+            bytes32(0)
+        );
+    }
 }
