@@ -24,6 +24,12 @@ forge script script/deploy/DeployGateway.sol:DeployGateway \
   --broadcast -vvvv \
   --verify --verifier blockscout \
   --verifier-url https://explorer.testnet3.goat.network/api/
+
+forge script ./script/deploy/DeploySequencerSetPublisher.sol:DeploySequencerSetPublisher \
+  --rpc-url goatTestnet \
+  --broadcast -vvvv \
+  --verify --verifier blockscout \
+  --verifier-url https://explorer.testnet3.goat.network/api/
 ```
 
 Repeat the command with the appropriate script name (and `goatMainnet` when deploying to mainnet). Required environment variables grow as you progress:
