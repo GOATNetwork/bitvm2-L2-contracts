@@ -9,6 +9,12 @@ interface ISequencerSetPublisher {
     error InvalidPublicKeyX();
     error ModexpFailed();
 
+    event SequencerSetUpdateSubmitted(
+        uint256 indexed goatHeight,
+        bytes32 indexed btcPubkeyHash,
+        bytes btcPubkey
+    );
+
     struct SequencerSetUpdateWitness {
         bytes32 sigHash;
         bytes btcPubkey;

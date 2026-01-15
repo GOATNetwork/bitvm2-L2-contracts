@@ -48,6 +48,12 @@ contract SequencerSetPublisher is
 
         _hasWitness[goatHeight][pubkeyHash] = true;
         _sequencerSetUpdateWitnesses[goatHeight].push(witness);
+
+        emit SequencerSetUpdateSubmitted(
+            goatHeight,
+            pubkeyHash,
+            witness.btcPubkey
+        );
     }
 
     function getSequencerSetUpdateWitnesses(
