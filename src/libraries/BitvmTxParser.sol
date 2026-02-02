@@ -215,31 +215,36 @@ library BitvmTxParser {
     {
         // match leading bytes
         require(offset >= 32, "cannot point to memory size slot");
-        if (uint8(data[offset - 32]) == 0xff) {
+        uint256 dataOffset = offset - 32;
+        uint256 dataLen = data.length;
+        require(dataOffset < dataLen, "compact size out of bounds");
+        if (uint8(data[dataOffset]) == 0xff) {
+            require(dataLen >= dataOffset + 1 + 8, "compact size out of bounds");
             nextOffset = offset + 9; // one-byte flag, 8 bytes data
             uint64 sizeRev;
             assembly {
                 sizeRev := mload(sub(add(data, offset), 23)) // -23 = 1 + 8 - 32
             }
             size = _reverseUint64(sizeRev);
-        }
-        if (uint8(data[offset - 32]) == 0xfe) {
+        } else if (uint8(data[dataOffset]) == 0xfe) {
+            require(dataLen >= dataOffset + 1 + 4, "compact size out of bounds");
             nextOffset = offset + 5; // one-byte flag, 4 bytes data
             uint32 sizeRev;
             assembly {
                 sizeRev := mload(sub(add(data, offset), 27)) // -27 = 1 + 4 - 32
             }
             size = _reverseUint32(sizeRev);
-        }
-        if (uint8(data[offset - 32]) == 0xfd) {
+        } else if (uint8(data[dataOffset]) == 0xfd) {
+            require(dataLen >= dataOffset + 1 + 2, "compact size out of bounds");
             nextOffset = offset + 3; // one-byte flag, 2 bytes data
             uint16 sizeRev;
             assembly {
                 sizeRev := mload(sub(add(data, offset), 29)) // -29 = 1 + 2 - 32
             }
             size = _reverseUint16(sizeRev);
+        } else {
+            nextOffset = offset + 1; // one-byte flag, 0 bytes data
+            size = uint8(data[dataOffset]);
         }
-        nextOffset = offset + 1; // one-byte flag, 0 bytes data
-        size = uint8(data[offset - 32]);
     }
 }
