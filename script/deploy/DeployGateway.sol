@@ -5,9 +5,7 @@ import {Script, console} from "forge-std/Script.sol";
 import {GatewayUpgradeable} from "../../src/Gateway.sol";
 import {IPegBTC} from "../../src/interfaces/IPegBTC.sol";
 import {IBitcoinSPV} from "../../src/interfaces/IBitcoinSPV.sol";
-import {
-    ICommitteeManagement
-} from "../../src/interfaces/ICommitteeManagement.sol";
+import {ICommitteeManagement} from "../../src/interfaces/ICommitteeManagement.sol";
 import {IStakeManagement} from "../../src/interfaces/IStakeManagement.sol";
 import {UpgradeableProxy} from "../../src/UpgradeableProxy.sol";
 
@@ -24,10 +22,7 @@ contract DeployGateway is Script {
         vm.startBroadcast(deployerPrivateKey);
 
         GatewayUpgradeable gatewayImpl = new GatewayUpgradeable();
-        console.log(
-            "Gateway implementation contract address: ",
-            address(gatewayImpl)
-        );
+        console.log("Gateway implementation contract address: ", address(gatewayImpl));
 
         bytes memory initCalldata = abi.encodeWithSelector(
             GatewayUpgradeable.initialize.selector,
@@ -37,11 +32,7 @@ contract DeployGateway is Script {
             IStakeManagement(stakeProxy)
         );
 
-        UpgradeableProxy gatewayProxy = new UpgradeableProxy(
-            address(gatewayImpl),
-            deployer,
-            initCalldata
-        );
+        UpgradeableProxy gatewayProxy = new UpgradeableProxy(address(gatewayImpl), deployer, initCalldata);
         console.log("Gateway proxy contract address: ", address(gatewayProxy));
 
         vm.stopBroadcast();

@@ -12,9 +12,7 @@ contract DeploySequencerSetPublisher is Script {
         console.log("current balance: ", initialOwner.balance);
         vm.startBroadcast(deployerPrivateKey);
         SequencerSetPublisher publisher = new SequencerSetPublisher();
-        publisher.initialize(
-            initialOwner
-        );
+        publisher.initialize(initialOwner);
         vm.stopBroadcast();
         console.log("SequencerSetPublisher deployed at:", address(publisher));
     }

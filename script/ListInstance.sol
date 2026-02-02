@@ -22,12 +22,12 @@ contract DebugListInstance is Script {
     function run() public {
         address gatewayAddr = vm.envAddress("GATEWAY_ADDR");
         gateway = GatewayUpgradeable(gatewayAddr);
-        
+
         console.log("Listing instances for Gateway at:", gatewayAddr);
 
         uint256 startIndex = vm.envOr("START_INDEX", uint256(0));
         uint256 endIndex = vm.envOr("END_INDEX", type(uint256).max);
-        
+
         filterPeginStatus = vm.envOr("FILTER_PEGIN_STATUS", int256(-1));
         filterWithdrawStatus = vm.envOr("FILTER_WITHDRAW_STATUS", int256(-1));
 
@@ -65,10 +65,9 @@ contract DebugListInstance is Script {
 
     function listInstance(uint256 index, bytes16 instanceId) internal view {
         // Get Pegin Status
-        (bool success, bytes memory data) = address(gateway).staticcall(
-            abi.encodeWithSelector(gateway.peginDataMap.selector, instanceId)
-        );
-        
+        (bool success, bytes memory data) =
+            address(gateway).staticcall(abi.encodeWithSelector(gateway.peginDataMap.selector, instanceId));
+
         uint256 statusVal;
         bool statusFetched = false;
         if (success && data.length >= 32) {
@@ -86,7 +85,7 @@ contract DebugListInstance is Script {
         console.log("Index:", index);
         console.log("Instance ID:");
         console.logBytes16(instanceId);
-        
+
         if (statusFetched) {
             console.log("Pegin Status:", getPeginStatusString(statusVal));
         } else {
@@ -107,15 +106,14 @@ contract DebugListInstance is Script {
 
     function listGraph(bytes16 graphId) internal view {
         // Get Withdraw Status
-        (bool success, bytes memory data) = address(gateway).staticcall(
-            abi.encodeWithSelector(gateway.withdrawDataMap.selector, graphId)
-        );
+        (bool success, bytes memory data) =
+            address(gateway).staticcall(abi.encodeWithSelector(gateway.withdrawDataMap.selector, graphId));
 
         uint256 statusVal;
         bool statusFetched = false;
         if (success && data.length >= 32) {
-             statusVal = abi.decode(data, (uint256));
-             statusFetched = true;
+            statusVal = abi.decode(data, (uint256));
+            statusFetched = true;
         }
 
         if (filterWithdrawStatus != -1) {
@@ -128,9 +126,9 @@ contract DebugListInstance is Script {
         console.logBytes16(graphId);
 
         if (statusFetched) {
-             console.log("    Withdraw Status:", getWithdrawStatusString(statusVal));
+            console.log("    Withdraw Status:", getWithdrawStatusString(statusVal));
         } else {
-             console.log("    Failed to fetch Withdraw Status");
+            console.log("    Failed to fetch Withdraw Status");
         }
     }
 }

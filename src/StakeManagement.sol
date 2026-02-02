@@ -2,9 +2,7 @@
 pragma solidity ^0.8.28;
 
 import {IStakeManagement} from "./interfaces/IStakeManagement.sol";
-import {
-    Initializable
-} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract StakeManagement is IStakeManagement, Initializable {
@@ -21,10 +19,7 @@ contract StakeManagement is IStakeManagement, Initializable {
         _disableInitializers();
     }
 
-    function initialize(
-        IERC20 _stakeToken,
-        address _gatewayAddress
-    ) public initializer {
+    function initialize(IERC20 _stakeToken, address _gatewayAddress) public initializer {
         require(address(_stakeToken) != address(0), "stake token zero");
         require(_gatewayAddress != address(0), "gateway zero");
         stakeToken = _stakeToken;
@@ -35,15 +30,11 @@ contract StakeManagement is IStakeManagement, Initializable {
         return address(stakeToken);
     }
 
-    function stakeOf(
-        address operator
-    ) external view override returns (uint256) {
+    function stakeOf(address operator) external view override returns (uint256) {
         return stakes[operator];
     }
 
-    function lockedStakeOf(
-        address operator
-    ) external view override returns (uint256) {
+    function lockedStakeOf(address operator) external view override returns (uint256) {
         return lockedStakes[operator];
     }
 
@@ -57,22 +48,13 @@ contract StakeManagement is IStakeManagement, Initializable {
         }
         stakes[operator] -= amount;
         // Transfer the slashed tokens to the gateway which redistributes rewards
-        require(
-            stakeToken.transfer(gatewayAddress, amount),
-            "stake transfer failed"
-        );
+        require(stakeToken.transfer(gatewayAddress, amount), "stake transfer failed");
         emit StakeSlashed(operator, amount);
     }
 
     function lockStake(address operator, uint256 amount) external override {
-        require(
-            msg.sender == operator || msg.sender == gatewayAddress,
-            "only operator or gateway can lock stake"
-        );
-        require(
-            stakes[operator] - lockedStakes[operator] >= amount,
-            "insufficient available stake to lock"
-        );
+        require(msg.sender == operator || msg.sender == gatewayAddress, "only operator or gateway can lock stake");
+        require(stakes[operator] - lockedStakes[operator] >= amount, "insufficient available stake to lock");
         lockedStakes[operator] += amount;
         emit StakeLocked(operator, amount);
     }
@@ -88,36 +70,21 @@ contract StakeManagement is IStakeManagement, Initializable {
     }
 
     function stake(uint256 amount) external {
-        require(
-            stakeToken.transferFrom(msg.sender, address(this), amount),
-            "stake transfer failed"
-        );
+        require(stakeToken.transferFrom(msg.sender, address(this), amount), "stake transfer failed");
         stakes[msg.sender] += amount;
         emit StakeDeposited(msg.sender, amount);
     }
 
     function unstake(uint256 amount) external {
-        require(
-            stakes[msg.sender] - lockedStakes[msg.sender] >= amount,
-            "insufficient available stake to unstake"
-        );
+        require(stakes[msg.sender] - lockedStakes[msg.sender] >= amount, "insufficient available stake to unstake");
         stakes[msg.sender] -= amount;
-        require(
-            stakeToken.transfer(msg.sender, amount),
-            "stake transfer failed"
-        );
+        require(stakeToken.transfer(msg.sender, amount), "stake transfer failed");
         emit StakeWithdrawn(msg.sender, amount);
     }
 
     function registerPubkey(bytes32 pubkey) external {
-        require(
-            addressToPubkey[msg.sender] == bytes32(0),
-            "already registered a pubkey"
-        );
-        require(
-            pubkeyToAddress[pubkey] == address(0),
-            "pubkey already registered by another address"
-        );
+        require(addressToPubkey[msg.sender] == bytes32(0), "already registered a pubkey");
+        require(pubkeyToAddress[pubkey] == address(0), "pubkey already registered by another address");
         addressToPubkey[msg.sender] = pubkey;
         pubkeyToAddress[pubkey] = msg.sender;
         emit PubkeyRegistered(msg.sender, pubkey);

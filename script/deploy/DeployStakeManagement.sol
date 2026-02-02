@@ -16,25 +16,12 @@ contract DeployStakeManagement is Script {
         vm.startBroadcast(deployerPrivateKey);
 
         StakeManagement stakeImpl = new StakeManagement();
-        console.log(
-            "StakeManagement implementation contract address: ",
-            address(stakeImpl)
-        );
+        console.log("StakeManagement implementation contract address: ", address(stakeImpl));
 
-        bytes memory stakeInitData = abi.encodeWithSelector(
-            StakeManagement.initialize.selector,
-            IERC20(pegBTC),
-            gatewayProxy
-        );
-        UpgradeableProxy stakeProxy = new UpgradeableProxy(
-            address(stakeImpl),
-            deployer,
-            stakeInitData
-        );
-        console.log(
-            "StakeManagement proxy contract address: ",
-            address(stakeProxy)
-        );
+        bytes memory stakeInitData =
+            abi.encodeWithSelector(StakeManagement.initialize.selector, IERC20(pegBTC), gatewayProxy);
+        UpgradeableProxy stakeProxy = new UpgradeableProxy(address(stakeImpl), deployer, stakeInitData);
+        console.log("StakeManagement proxy contract address: ", address(stakeProxy));
 
         vm.stopBroadcast();
     }

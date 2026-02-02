@@ -9,11 +9,7 @@ interface ISequencerSetPublisher {
     error InvalidPublicKeyX();
     error ModexpFailed();
 
-    event SequencerSetUpdateSubmitted(
-        uint256 indexed goatHeight,
-        bytes32 indexed btcPubkeyHash,
-        bytes btcPubkey
-    );
+    event SequencerSetUpdateSubmitted(uint256 indexed goatHeight, bytes32 indexed btcPubkeyHash, bytes btcPubkey);
 
     struct SequencerSetUpdateWitness {
         bytes32 sigHash;
@@ -21,12 +17,10 @@ interface ISequencerSetPublisher {
         bytes btcSig;
     }
 
-    function updateSequencerSet(
-        uint256 goatHeight,
-        SequencerSetUpdateWitness calldata witness
-    ) external;
+    function updateSequencerSet(uint256 goatHeight, SequencerSetUpdateWitness calldata witness) external;
 
-    function getSequencerSetUpdateWitnesses(
-        uint256 goatHeight
-    ) external view returns (SequencerSetUpdateWitness[] memory);
+    function getSequencerSetUpdateWitnesses(uint256 goatHeight)
+        external
+        view
+        returns (SequencerSetUpdateWitness[] memory);
 }
