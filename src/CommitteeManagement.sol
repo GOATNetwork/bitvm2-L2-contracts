@@ -84,6 +84,10 @@ contract CommitteeManagement is MultiSigVerifier {
     /// @notice Emitted when a member updates their PeerId
     event PeerIdUpdated(address indexed member, bytes peerId);
 
+    /// @notice Emitted when a watchtower is added/removed
+    event WatchtowerAdded(bytes32 indexed watchtower);
+    event WatchtowerRemoved(bytes32 indexed watchtower);
+
     /// @notice Register/update the caller's PeerId for P2P usage
     function registerPeerId(bytes calldata peerId) external {
         require(isOwner[msg.sender], "Not a committee member");
@@ -186,6 +190,7 @@ contract CommitteeManagement is MultiSigVerifier {
         bytes32 msgHash = _getAddWatchtowerDigest(watchtower);
         _executeNoncedSignatures(msgHash, nonce, authSignatures);
         watchtowerList.add(watchtower);
+        emit WatchtowerAdded(watchtower);
     }
 
     /// @notice Remove a watchtower address via committee authorization
@@ -197,6 +202,7 @@ contract CommitteeManagement is MultiSigVerifier {
         bytes32 msgHash = _getRemoveWatchtowerDigest(watchtower);
         _executeNoncedSignatures(msgHash, nonce, authSignatures);
         watchtowerList.remove(watchtower);
+        emit WatchtowerRemoved(watchtower);
     }
 
     // ========== Digest Helpers (Watchtower) ==========

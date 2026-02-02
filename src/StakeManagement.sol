@@ -61,6 +61,7 @@ contract StakeManagement is IStakeManagement, Initializable {
             stakeToken.transfer(gatewayAddress, amount),
             "stake transfer failed"
         );
+        emit StakeSlashed(operator, amount);
     }
 
     function lockStake(address operator, uint256 amount) external override {
@@ -73,6 +74,7 @@ contract StakeManagement is IStakeManagement, Initializable {
             "insufficient available stake to lock"
         );
         lockedStakes[operator] += amount;
+        emit StakeLocked(operator, amount);
     }
 
     function unlockStake(address operator, uint256 amount) external override {
@@ -82,6 +84,7 @@ contract StakeManagement is IStakeManagement, Initializable {
         } else {
             lockedStakes[operator] = 0;
         }
+        emit StakeUnlocked(operator, amount);
     }
 
     function stake(uint256 amount) external {
@@ -90,6 +93,7 @@ contract StakeManagement is IStakeManagement, Initializable {
             "stake transfer failed"
         );
         stakes[msg.sender] += amount;
+        emit StakeDeposited(msg.sender, amount);
     }
 
     function unstake(uint256 amount) external {
@@ -102,6 +106,7 @@ contract StakeManagement is IStakeManagement, Initializable {
             stakeToken.transfer(msg.sender, amount),
             "stake transfer failed"
         );
+        emit StakeWithdrawn(msg.sender, amount);
     }
 
     function registerPubkey(bytes32 pubkey) external {
@@ -115,6 +120,7 @@ contract StakeManagement is IStakeManagement, Initializable {
         );
         addressToPubkey[msg.sender] = pubkey;
         pubkeyToAddress[pubkey] = msg.sender;
+        emit PubkeyRegistered(msg.sender, pubkey);
     }
 
     uint256[50] private __gap;
