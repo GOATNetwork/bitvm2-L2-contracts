@@ -7,10 +7,10 @@ import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {IBitcoinSPV} from "./interfaces/IBitcoinSPV.sol";
 import {IPegBTC} from "./interfaces/IPegBTC.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {ICommitteeManagement} from "./interfaces/ICommitteeManagement.sol";
 import {IStakeManagement} from "./interfaces/IStakeManagement.sol";
 import {IGateway} from "./interfaces/IGateway.sol";
-import {Converter} from "./libraries/Converter.sol";
 import {BitvmTxParser} from "./libraries/BitvmTxParser.sol";
 import {MerkleProof} from "./libraries/MerkleProof.sol";
 
@@ -33,6 +33,8 @@ contract BitvmPolicy {
 
 contract GatewayUpgradeable is BitvmPolicy, Initializable, IGateway {
     using ECDSA for bytes32;
+
+    uint8 private constant BTC_DECIMALS = 8;
 
     // EIP-712-like typehash constants to avoid recomputing literals
     bytes32 private constant POST_PEGIN_TYPEHASH =
@@ -220,7 +222,7 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable, IGateway {
         withdrawData.status = WithdrawStatus.Complete;
 
         uint64 rewardAmountSats = _operatorReward(peginData.peginAmountSats);
-        pegBTC.transfer(withdrawData.operatorAddress, Converter._amountFromSats(rewardAmountSats));
+        pegBTC.transfer(withdrawData.operatorAddress, _amountFromSats(rewardAmountSats));
 
         if (happyPath) {
             emit WithdrawHappyPath(instanceId, graphId, takeTxid, withdrawData.operatorAddress, rewardAmountSats);
@@ -371,8 +373,8 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable, IGateway {
         // deduct a fee from the User to cover the Operator's peg-out reward
         uint64 feeAmountSats = minPeginFeeSats + (peginAmountSats * peginFeeRate) / rateMultiplier;
         if (feeAmountSats >= peginAmountSats) revert FeeTooHigh();
-        pegBTC.mint(depositorAddress, Converter._amountFromSats(peginAmountSats - feeAmountSats));
-        pegBTC.mint(address(this), Converter._amountFromSats(feeAmountSats));
+        pegBTC.mint(depositorAddress, _amountFromSats(peginAmountSats - feeAmountSats));
+        pegBTC.mint(address(this), _amountFromSats(feeAmountSats));
 
         emit BridgeIn(depositorAddress, instanceId, peginAmountSats, feeAmountSats);
     }
@@ -423,7 +425,7 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable, IGateway {
         peginData.status = PeginStatus.Locked;
 
         // lock operator's pegBTC
-        uint256 lockAmount = Converter._amountFromSats(peginData.peginAmountSats);
+        uint256 lockAmount = _amountFromSats(peginData.peginAmountSats);
         pegBTC.transferFrom(msg.sender, address(this), lockAmount);
 
         withdrawData.peginTxid = peginData.peginTxid;
@@ -649,5 +651,13 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable, IGateway {
         bytes32 msgHash = _getUnlockStakeDigest(operator, amount);
         committeeManagement.executeNoncedSignatures(msgHash, nonce, committeeSigs);
         stakeManagement.unlockStake(operator, amount);
+    }
+
+    function _amountFromSats(uint64 amountSats) internal view returns (uint256) {
+        uint8 tokenDecimals = IERC20Metadata(address(pegBTC)).decimals();
+        if (tokenDecimals >= BTC_DECIMALS) {
+            return uint256(amountSats) * 10 ** (tokenDecimals - BTC_DECIMALS);
+        }
+        return uint256(amountSats / uint64(10 ** (BTC_DECIMALS - tokenDecimals)));
     }
 }

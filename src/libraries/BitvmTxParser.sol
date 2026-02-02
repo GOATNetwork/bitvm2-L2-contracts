@@ -17,7 +17,7 @@ library BitvmTxParser {
 
     function _parsePegin(BitcoinTx memory bitcoinTx)
         internal
-        pure
+        view
         returns (bytes32 peginTxid, uint64 peginAmountSats, address depositorAddress, bytes16 instanceId)
     {
         peginTxid = _computeTxid(bitcoinTx);
@@ -38,7 +38,7 @@ library BitvmTxParser {
         (uint256 opReturnScriptSize, uint256 opReturnScriptOffset) = _parseCompactSize(txouts, nextTxoutOffset + 8);
         bytes2 firstTwoOpcode = bytes2(_memLoad(txouts, opReturnScriptOffset));
         require(opReturnScriptSize == 46 && firstTwoOpcode == 0x6a2c, "invalid pegin OP_RETURN script");
-        require(bytes8(_memLoad(txouts, opReturnScriptOffset + 2)) == Constants.magic_bytes, "magic_bytes mismatch");
+        require(bytes8(_memLoad(txouts, opReturnScriptOffset + 2)) == Constants.magicBytes(), "magic_bytes mismatch");
         instanceId = bytes16(_memLoad(txouts, opReturnScriptOffset + 10));
         depositorAddress = address(bytes20(_memLoad(txouts, opReturnScriptOffset + 26)));
         peginAmountSats = _reverseUint64(peginAmountSatsRev);
