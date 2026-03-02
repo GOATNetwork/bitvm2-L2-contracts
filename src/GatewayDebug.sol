@@ -5,12 +5,13 @@ import {GatewayUpgradeable} from "./Gateway.sol";
 import {CommitteeManagement} from "./CommitteeManagement.sol";
 import {StakeManagement} from "./StakeManagement.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import {IBitcoinSPV} from "./interfaces/IBitcoinSPV.sol";
 
 contract GatewayDebug is GatewayUpgradeable {
-    function mockProceedWithdraw(bytes16 graphId) external onlyCommittee {
-        WithdrawData storage withdrawData = withdrawDataMap[graphId];
-        withdrawData.status = WithdrawStatus.Processing;
-    }
+    // function mockProceedWithdraw(bytes16 graphId) external onlyCommittee {
+    //     WithdrawData storage withdrawData = withdrawDataMap[graphId];
+    //     withdrawData.status = WithdrawStatus.Processing;
+    // }
 
     function debugMintPegBTC(address to, uint256 amount) external onlyCommittee {
         pegBTC.mint(to, amount);
@@ -50,23 +51,27 @@ contract GatewayDebug is GatewayUpgradeable {
     //     minSlashAmount = _minSlashAmount;
     // }
 
-    // function debugClearData() external onlyCommittee {
-    //     for (uint256 i = 0; i < instanceIds.length; i++) {
-    //         bytes16 instanceId = instanceIds[i];
+    function debugClearData() external onlyCommittee {
+        for (uint256 i = 0; i < instanceIds.length; i++) {
+            bytes16 instanceId = instanceIds[i];
 
-    //         bytes16[] storage graphIds = instanceIdToGraphIds[instanceId];
-    //         for (uint256 j = 0; j < graphIds.length; j++) {
-    //             bytes16 graphId = graphIds[j];
-    //             delete graphDataMap[graphId];
-    //             delete withdrawDataMap[graphId];
-    //         }
+            bytes16[] storage graphIds = instanceIdToGraphIds[instanceId];
+            for (uint256 j = 0; j < graphIds.length; j++) {
+                bytes16 graphId = graphIds[j];
+                delete graphDataMap[graphId];
+                delete withdrawDataMap[graphId];
+            }
 
-    //         delete instanceIdToGraphIds[instanceId];
-    //         delete peginDataMap[instanceId];
-    //     }
+            delete instanceIdToGraphIds[instanceId];
+            delete peginDataMap[instanceId];
+        }
 
-    //     delete instanceIds;
-    // }
+        delete instanceIds;
+    }
+
+    function debugUpdateSpvContract(IBitcoinSPV _bitcoinSPV) external onlyCommittee {
+        bitcoinSPV = _bitcoinSPV;
+    }
 
     function debugCancelWithdraw(bytes16 graphId) external onlyOperator(graphId) {
         WithdrawData storage withdrawData = withdrawDataMap[graphId];
@@ -84,7 +89,6 @@ contract CommitteeManagementDebug is CommitteeManagement {
     using EnumerableSet for EnumerableSet.AddressSet;
     using EnumerableSet for EnumerableSet.Bytes32Set;
 
-
     modifier onlyCommittee() {
         require(isOwner[msg.sender], "only committee member can call");
         _;
@@ -92,6 +96,42 @@ contract CommitteeManagementDebug is CommitteeManagement {
 
     function debugUpdateCommittee(address[] calldata newCommittee, uint256 newRequired) external onlyCommittee {
         _applyOwners(newCommittee, newRequired);
+    }
+
+    function debugUpdateCommitteeAddress(address old_member, address new_member) external onlyCommittee {
+        require(old_member != address(0) && new_member != address(0), "zero addr");
+        require(old_member != new_member, "same addr");
+        require(isOwner[old_member], "old not member");
+        require(!isOwner[new_member], "new already member");
+
+        // swap ownership in mapping
+        isOwner[old_member] = false;
+        isOwner[new_member] = true;
+
+        // replace entry in ownerList
+        bool replaced;
+        for (uint256 i = 0; i < ownerList.length; i++) {
+            if (ownerList[i] == old_member) {
+                ownerList[i] = new_member;
+                replaced = true;
+                break;
+            }
+        }
+        require(replaced, "old member missing");
+
+        // move peerId to the new member while preserving uniqueness
+        bytes memory prev = committeePeerId[old_member];
+        if (prev.length != 0) {
+            require(committeePeerId[new_member].length == 0, "new has peerId");
+            bytes32 h = keccak256(prev);
+            address current = peerIdOwnerByHash[h];
+            require(current == address(0) || current == old_member, "peerId conflict");
+            if (current == old_member) {
+                peerIdOwnerByHash[h] = new_member;
+            }
+            committeePeerId[new_member] = prev;
+            delete committeePeerId[old_member];
+        }
     }
 
     function debugAddWatchtower(bytes32 watchtower) external onlyCommittee {
@@ -128,5 +168,24 @@ contract CommitteeManagementDebug is CommitteeManagement {
 
         committeePeerId[member] = peerId;
         peerIdOwnerByHash[h] = member;
+    }
+}
+
+contract StakeManagementDebug is StakeManagement {
+    function debugUpdatePubkey(bytes32 pubkey) external {
+        // Allow operators to replace their registered x-only pubkey in debug mode
+        bytes32 oldPubkey = addressToPubkey[msg.sender];
+
+        // If a pubkey was previously set, clear the reverse mapping
+        if (oldPubkey != bytes32(0)) {
+            delete pubkeyToAddress[oldPubkey];
+        }
+
+        // Enforce unique pubkeys to keep mappings bijective
+        address currentOwner = pubkeyToAddress[pubkey];
+        require(currentOwner == address(0) || currentOwner == msg.sender, "pubkey already registered");
+
+        addressToPubkey[msg.sender] = pubkey;
+        pubkeyToAddress[pubkey] = msg.sender;
     }
 }

@@ -16,7 +16,7 @@ contract OperatorRegisterPubkey is Script {
     function run() public {
         uint256 operatorPrivateKey = vm.envUint("PRIVATE_KEY");
         address operator = vm.addr(operatorPrivateKey);
-        
+
         address gatewayAddr = vm.envAddress("GATEWAY_ADDR");
         bytes32 pubkey = vm.envBytes32("PUBKEY");
 
@@ -29,7 +29,7 @@ contract OperatorRegisterPubkey is Script {
         console.log("StakeManagement:", stakeManagementAddr);
 
         StakeManagement(stakeManagementAddr).registerPubkey(pubkey);
-        
+
         console.log("Pubkey registered successfully");
 
         vm.stopBroadcast();

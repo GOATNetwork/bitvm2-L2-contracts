@@ -136,11 +136,7 @@ interface IGateway {
         string userChangeAddress,
         string userRefundAddress
     );
-    event CommitteeResponse(
-        bytes16 indexed instanceId,
-        address indexed committeeAddress,
-        bytes committeePubkey
-    );
+    event CommitteeResponse(bytes16 indexed instanceId, address indexed committeeAddress, bytes committeePubkey);
     event BridgeIn(
         address indexed depositorAddress,
         bytes16 indexed instanceId,
@@ -149,21 +145,10 @@ interface IGateway {
     );
     event PostGraphData(bytes16 indexed instanceId, bytes16 indexed graphId);
     event InitWithdraw(
-        bytes16 indexed instanceId,
-        bytes16 indexed graphId,
-        address indexed operatorAddress,
-        uint64 withdrawAmountSats
+        bytes16 indexed instanceId, bytes16 indexed graphId, address indexed operatorAddress, uint64 withdrawAmountSats
     );
-    event CancelWithdraw(
-        bytes16 indexed instanceId,
-        bytes16 indexed graphId,
-        address indexed triggerAddress
-    );
-    event ProceedWithdraw(
-        bytes16 indexed instanceId,
-        bytes16 indexed graphId,
-        bytes32 kickoffTxid
-    );
+    event CancelWithdraw(bytes16 indexed instanceId, bytes16 indexed graphId, address indexed triggerAddress);
+    event ProceedWithdraw(bytes16 indexed instanceId, bytes16 indexed graphId, bytes32 kickoffTxid);
     event WithdrawHappyPath(
         bytes16 indexed instanceId,
         bytes16 indexed graphId,

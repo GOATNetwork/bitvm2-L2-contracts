@@ -5,7 +5,7 @@ import {Script, console} from "forge-std/Script.sol";
 
 import {IPegBTC} from "../src/interfaces/IPegBTC.sol";
 import {GatewayUpgradeable} from "../src/Gateway.sol";
-import {Converter} from "../src/libraries/Converter.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 /*
 	Script: approve PegBTC for the Gateway (if needed) and call Gateway.initWithdraw(instanceId, graphId).
@@ -17,6 +17,8 @@ import {Converter} from "../src/libraries/Converter.sol";
 
 */
 contract InitWithdraw is Script {
+    uint8 private constant BTC_DECIMALS = 8;
+
     function run() external {
         // Load inputs
         uint256 pk = vm.envUint("PRIVATE_KEY");
@@ -42,7 +44,8 @@ contract InitWithdraw is Script {
         // Read pegin data to compute the exact lock amount in PegBTC
         GatewayUpgradeable.PeginData memory pegin = gateway.getPeginData(instanceId);
         require(pegin.peginAmountSats > 0, "pegin not found or amount=0");
-        uint256 lockAmount = Converter._amountFromSats(pegin.peginAmountSats);
+        uint8 tokenDecimals = IERC20Metadata(pegBtcAddr).decimals();
+        uint256 lockAmount = _amountFromSats(pegin.peginAmountSats, tokenDecimals);
 
         // derive sender address from private key in a view-only way
         address operator = vm.addr(pk);
@@ -70,5 +73,12 @@ contract InitWithdraw is Script {
         vm.stopBroadcast();
 
         console.log("\ninitWithdraw sent:");
+    }
+
+    function _amountFromSats(uint64 amountSats, uint8 tokenDecimals) internal pure returns (uint256) {
+        if (tokenDecimals >= BTC_DECIMALS) {
+            return uint256(amountSats) * 10 ** (tokenDecimals - BTC_DECIMALS);
+        }
+        return uint256(amountSats / uint64(10 ** (BTC_DECIMALS - tokenDecimals)));
     }
 }

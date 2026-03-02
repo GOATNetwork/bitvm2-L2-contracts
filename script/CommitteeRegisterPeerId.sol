@@ -16,7 +16,7 @@ contract RegisterPeerId is Script {
     function run() public {
         uint256 committeePrivateKey = vm.envUint("PRIVATE_KEY");
         address committee = vm.addr(committeePrivateKey);
-        
+
         address gatewayAddr = vm.envAddress("GATEWAY_ADDR");
         address committeeManagementAddr = address(GatewayUpgradeable(payable(gatewayAddr)).committeeManagement());
         bytes memory peerId = vm.envBytes("PEER_ID");
@@ -29,7 +29,7 @@ contract RegisterPeerId is Script {
         vm.startBroadcast(committeePrivateKey);
 
         CommitteeManagement(committeeManagementAddr).registerPeerId(peerId);
-        
+
         console.log("Peer ID registered successfully");
 
         vm.stopBroadcast();
