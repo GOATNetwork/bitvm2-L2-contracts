@@ -438,21 +438,21 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable, IGateway {
         emit InitWithdraw(instanceId, graphId, withdrawData.operatorAddress, peginData.peginAmountSats);
     }
 
-    function cancelWithdraw(bytes16 graphId) external onlyOperator(graphId) {
-        WithdrawData storage withdrawData = withdrawDataMap[graphId];
-        PeginDataInner storage peginData = peginDataMap[withdrawData.instanceId];
-        if (withdrawData.status != WithdrawStatus.Initialized) {
-            revert WithdrawStatusInvalid();
-        }
-        if (withdrawData.btcBlockHeightAtWithdraw + cancelWithdrawTimelock >= bitcoinSPV.latestHeight()) {
-            revert TimelockNotExpired();
-        }
-        withdrawData.status = WithdrawStatus.Canceled;
-        pegBTC.transfer(withdrawData.operatorAddress, withdrawData.lockAmount);
-        peginData.status = PeginStatus.Withdrawbale;
+    // function cancelWithdraw(bytes16 graphId) external onlyOperator(graphId) {
+    //     WithdrawData storage withdrawData = withdrawDataMap[graphId];
+    //     PeginDataInner storage peginData = peginDataMap[withdrawData.instanceId];
+    //     if (withdrawData.status != WithdrawStatus.Initialized) {
+    //         revert WithdrawStatusInvalid();
+    //     }
+    //     if (withdrawData.btcBlockHeightAtWithdraw + cancelWithdrawTimelock >= bitcoinSPV.latestHeight()) {
+    //         revert TimelockNotExpired();
+    //     }
+    //     withdrawData.status = WithdrawStatus.Canceled;
+    //     pegBTC.transfer(withdrawData.operatorAddress, withdrawData.lockAmount);
+    //     peginData.status = PeginStatus.Withdrawbale;
 
-        emit CancelWithdraw(withdrawData.instanceId, graphId, withdrawData.operatorAddress);
-    }
+    //     emit CancelWithdraw(withdrawData.instanceId, graphId, withdrawData.operatorAddress);
+    // }
 
     function committeeCancelWithdraw(bytes16 graphId, uint256 nonce, bytes[] calldata committeeSigs) external {
         // validate committeeSigs
