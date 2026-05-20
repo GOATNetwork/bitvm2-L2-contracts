@@ -36,9 +36,6 @@ interface IGateway {
 
     // ===== Enums =====
     enum DisproveTxType {
-        AssertTimeout,
-        OperatorCommitTimeout,
-        OperatorNack,
         Disprove,
         QuickChallenge,
         ChallengeIncompeleteKickoff
@@ -120,9 +117,8 @@ interface IGateway {
         bytes32 kickoffTxid;
         bytes32 take1Txid;
         bytes32 take2Txid;
-        bytes32 commitTimoutTxid;
-        bytes32[] assertTimoutTxids;
-        bytes32[] NackTxids;
+        bytes32 proverAssertTxid;
+        bytes32[] disproveTxids;
     }
 
     // ===== Events =====

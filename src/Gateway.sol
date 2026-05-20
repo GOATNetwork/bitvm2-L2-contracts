@@ -560,32 +560,12 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable, IGateway {
         // verify ChallengeFinish tx
         bytes32 challengeFinishTxid;
         address disproverAddress;
-        if (disproveTxType == DisproveTxType.AssertTimeout) {
+        if (disproveTxType == DisproveTxType.Disprove) {
             (challengeFinishTxid) = BitvmTxParser._computeTxid(rawChallengeFinishTx);
-            if (graphData.assertTimoutTxids.length <= txnIndex) {
+            if (graphData.disproveTxids.length <= txnIndex) {
                 revert IndexOutOfRange();
             }
-            if (challengeFinishTxid != graphData.assertTimoutTxids[txnIndex]) {
-                revert TxidMismatch();
-            }
-        } else if (disproveTxType == DisproveTxType.OperatorCommitTimeout) {
-            (challengeFinishTxid) = BitvmTxParser._computeTxid(rawChallengeFinishTx);
-            if (challengeFinishTxid != graphData.commitTimoutTxid) {
-                revert TxidMismatch();
-            }
-        } else if (disproveTxType == DisproveTxType.OperatorNack) {
-            (challengeFinishTxid) = BitvmTxParser._computeTxid(rawChallengeFinishTx);
-            if (graphData.NackTxids.length <= txnIndex) {
-                revert IndexOutOfRange();
-            }
-            if (challengeFinishTxid != graphData.NackTxids[txnIndex]) {
-                revert TxidMismatch();
-            }
-        } else if (disproveTxType == DisproveTxType.Disprove) {
-            (challengeFinishTxid, kickoffTxid, kickoffVout, disproverAddress) =
-                BitvmTxParser._parseDisproveTx(rawChallengeFinishTx);
-            if (kickoffTxid != graphData.kickoffTxid) revert TxidMismatch();
-            if (kickoffVout != BitvmTxParser.DISPROVE_CONNECTOR_VOUT) {
+            if (challengeFinishTxid != graphData.disproveTxids[txnIndex]) {
                 revert TxidMismatch();
             }
         } else if (disproveTxType == DisproveTxType.QuickChallenge) {

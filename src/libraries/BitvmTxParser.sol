@@ -12,7 +12,7 @@ library BitvmTxParser {
     }
 
     uint32 constant CHALLENGE_CONNECTOR_VOUT = 0;
-    uint32 constant DISPROVE_CONNECTOR_VOUT = 3;
+    uint32 constant DISPROVE_CONNECTOR_VOUT = 1;
     uint32 constant GUARDIAN_CONNECTOR_VOUT = 4;
 
     function _parsePegin(BitcoinTx memory bitcoinTx)
@@ -83,16 +83,16 @@ library BitvmTxParser {
     function _parseDisproveTx(BitcoinTx memory bitcoinTx)
         internal
         pure
-        returns (bytes32 disproveTxid, bytes32 kickoffTxid, uint32 kickoffVout, address challengerAddress)
+        returns (bytes32 disproveTxid, bytes32 assertTxid, uint32 connectorDVout, address challengerAddress)
     {
         disproveTxid = _computeTxid(bitcoinTx);
 
-        // kickoffTxid is txid of the txin[0]
+        // assertTxid is txid of the txin[1]
+        // connectorDVout is vout of the txin[1]
         bytes memory txin = bitcoinTx.inputVector;
         (, uint256 offset) = _parseCompactSize(txin, 32);
-        kickoffTxid = _memLoad(txin, offset);
-        // kickoffVout is vout of the txin[0]
-        kickoffVout = _reverseUint32(uint32(bytes4(_memLoad(txin, offset + 32))));
+        assertTxid = _memLoad(txin, offset + 36);
+        connectorDVout = _reverseUint32(uint32(bytes4(_memLoad(txin, offset + 68))));
 
         // challengerAddress is op_return data of txout[0]
         // if txout[0] is not op_return, return address(0)
