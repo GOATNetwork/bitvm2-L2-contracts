@@ -45,7 +45,7 @@ contract DebugListInstance is Script {
     function getPeginStatusString(uint256 status) internal pure returns (string memory) {
         if (status == uint256(IGateway.PeginStatus.None)) return "None";
         if (status == uint256(IGateway.PeginStatus.Pending)) return "Pending";
-        if (status == uint256(IGateway.PeginStatus.Withdrawbale)) return "Withdrawbale";
+        if (status == uint256(IGateway.PeginStatus.Withdrawable)) return "Withdrawable";
         if (status == uint256(IGateway.PeginStatus.Processing)) return "Processing";
         if (status == uint256(IGateway.PeginStatus.Locked)) return "Locked";
         if (status == uint256(IGateway.PeginStatus.Claimed)) return "Claimed";

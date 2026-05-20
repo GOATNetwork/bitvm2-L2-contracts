@@ -366,7 +366,7 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable, IGateway {
         }
 
         // update storage
-        peginData.status = PeginStatus.Withdrawbale;
+        peginData.status = PeginStatus.Withdrawable;
         peginData.peginTxid = peginTxid;
 
         // mint pegBTC to user
@@ -417,7 +417,7 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable, IGateway {
             revert WithdrawStatusInvalid();
         }
         PeginDataInner storage peginData = peginDataMap[instanceId];
-        if (peginData.status != PeginStatus.Withdrawbale) {
+        if (peginData.status != PeginStatus.Withdrawable) {
             revert NotWithdrawable();
         }
 
@@ -449,7 +449,7 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable, IGateway {
     //     }
     //     withdrawData.status = WithdrawStatus.Canceled;
     //     pegBTC.transfer(withdrawData.operatorAddress, withdrawData.lockAmount);
-    //     peginData.status = PeginStatus.Withdrawbale;
+    //     peginData.status = PeginStatus.Withdrawable;
 
     //     emit CancelWithdraw(withdrawData.instanceId, graphId, withdrawData.operatorAddress);
     // }
@@ -466,7 +466,7 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable, IGateway {
         }
         withdrawData.status = WithdrawStatus.Canceled;
         pegBTC.transfer(withdrawData.operatorAddress, withdrawData.lockAmount);
-        peginData.status = PeginStatus.Withdrawbale;
+        peginData.status = PeginStatus.Withdrawable;
         emit CancelWithdraw(withdrawData.instanceId, graphId, withdrawData.operatorAddress);
     }
 
@@ -517,7 +517,7 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable, IGateway {
         _finalizeWithdraw(graphId, rawTake2Tx, take2Proof, graphData.take2Txid, false);
     }
 
-    // if no challengeStartTx happens (for QuickChallenge & ChallengeIncompeleteKickoff), set rawChallengeStartTx.inputVector to empty
+    // if no challengeStartTx happens (for QuickChallenge & ChallengeIncompleteKickoff), set rawChallengeStartTx.inputVector to empty
     function finishWithdrawDisproved(
         bytes16 graphId,
         DisproveTxType disproveTxType,
@@ -543,7 +543,7 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable, IGateway {
         if (
             (
                 disproveTxType == DisproveTxType.QuickChallenge
-                    || disproveTxType == DisproveTxType.ChallengeIncompeleteKickoff
+                    || disproveTxType == DisproveTxType.ChallengeIncompleteKickoff
             ) && (rawChallengeStartTx.inputVector.length == 0)
         ) {
             // no challenge start tx
@@ -575,7 +575,7 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable, IGateway {
             if (kickoffVout != BitvmTxParser.GUARDIAN_CONNECTOR_VOUT) {
                 revert TxidMismatch();
             }
-        } else if (disproveTxType == DisproveTxType.ChallengeIncompeleteKickoff) {
+        } else if (disproveTxType == DisproveTxType.ChallengeIncompleteKickoff) {
             (challengeFinishTxid, kickoffTxid, kickoffVout, disproverAddress) =
                 BitvmTxParser._parseChallengeIncompleteKickoffTx(rawChallengeFinishTx);
             if (kickoffTxid != graphData.kickoffTxid) revert TxidMismatch();

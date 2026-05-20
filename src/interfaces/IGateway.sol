@@ -38,13 +38,13 @@ interface IGateway {
     enum DisproveTxType {
         Disprove,
         QuickChallenge,
-        ChallengeIncompeleteKickoff
+        ChallengeIncompleteKickoff
     }
 
     enum PeginStatus {
         None,
         Pending,
-        Withdrawbale,
+        Withdrawable,
         Processing,
         Locked,
         Claimed,
