@@ -6,8 +6,8 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
 
 /// @title CommitteeManagement
 /// @notice Manages committee membership verification, authorized message execution with anti-replay,
-///         watchtower registry, peerId registry, and a whitelist of integrator contracts that are
-///         allowed to consume committee-signed authorizations.
+///         watchtower registry, committee/verifier peerId registries, and a whitelist of integrator
+///         contracts that are allowed to consume committee-signed authorizations.
 /// @dev Inherits MultiSigVerifier for owner set and threshold management. Messages are domain-bound
 ///      to this contract address and are protected by a per-message nonce scheme stored off-chain
 ///      in the signed payload and on-chain by the `executed` mapping.
@@ -27,6 +27,9 @@ contract CommitteeManagement is MultiSigVerifier {
 
     /// @notice Tracks whether a nonced message hash has been consumed on-chain to prevent replay.
     mapping(bytes32 => bool) public executed;
+    // Set of registered verifier peerIds, keyed by keccak256(raw peerId)
+    EnumerableSet.Bytes32Set verifierList;
+    mapping(bytes32 => bytes) internal verifierPeerIds;
 
     // ========== Initialization ==========
     constructor() {
@@ -83,6 +86,10 @@ contract CommitteeManagement is MultiSigVerifier {
     event WatchtowerAdded(bytes32 indexed watchtower);
     event WatchtowerRemoved(bytes32 indexed watchtower);
 
+    /// @notice Emitted when a verifier peerId is added/removed
+    event VerifierAdded(bytes32 indexed peerIdHash, bytes peerId);
+    event VerifierRemoved(bytes32 indexed peerIdHash, bytes peerId);
+
     /// @notice Register/update the caller's PeerId for P2P usage
     function registerPeerId(bytes calldata peerId) external {
         require(isOwner[msg.sender], "Not a committee member");
@@ -126,6 +133,20 @@ contract CommitteeManagement is MultiSigVerifier {
     /// @notice Returns the list of registered watchtowers
     function getWatchtowers() external view returns (bytes32[] memory) {
         return watchtowerList.values();
+    }
+
+    /// @notice Returns the list of registered verifier peerIds
+    function getVerifiers() external view returns (bytes[] memory verifiers) {
+        bytes32[] memory verifierHashes = verifierList.values();
+        verifiers = new bytes[](verifierHashes.length);
+        for (uint256 i = 0; i < verifierHashes.length; i++) {
+            verifiers[i] = verifierPeerIds[verifierHashes[i]];
+        }
+    }
+
+    /// @notice Returns whether a verifier peerId is currently registered
+    function isVerifier(bytes calldata peerId) external view returns (bool) {
+        return verifierList.contains(keccak256(peerId));
     }
 
     // ========== Modifiers ==========
@@ -176,6 +197,31 @@ contract CommitteeManagement is MultiSigVerifier {
         emit WatchtowerRemoved(watchtower);
     }
 
+    // ========== Verifier Management ==========
+    /// @notice Add a verifier peerId via committee authorization
+    function addVerifier(bytes calldata peerId, uint256 nonce, bytes[] memory authSignatures) external {
+        require(peerId.length != 0, "empty peerId");
+        bytes32 msgHash = _getAddVerifierDigest(peerId);
+        _executeNoncedSignatures(msgHash, nonce, authSignatures);
+
+        bytes32 peerIdHash = keccak256(peerId);
+        verifierList.add(peerIdHash);
+        verifierPeerIds[peerIdHash] = peerId;
+        emit VerifierAdded(peerIdHash, peerId);
+    }
+
+    /// @notice Remove a verifier peerId via committee authorization
+    function removeVerifier(bytes calldata peerId, uint256 nonce, bytes[] memory authSignatures) external {
+        require(peerId.length != 0, "empty peerId");
+        bytes32 msgHash = _getRemoveVerifierDigest(peerId);
+        _executeNoncedSignatures(msgHash, nonce, authSignatures);
+
+        bytes32 peerIdHash = keccak256(peerId);
+        verifierList.remove(peerIdHash);
+        delete verifierPeerIds[peerIdHash];
+        emit VerifierRemoved(peerIdHash, peerId);
+    }
+
     // ========== Digest Helpers (Watchtower) ==========
     /// @dev Returns the domain-bound message hash for adding a watchtower (without nonce)
     function _getAddWatchtowerDigest(bytes32 watchtower) internal view returns (bytes32) {
@@ -198,6 +244,31 @@ contract CommitteeManagement is MultiSigVerifier {
     /// @notice Returns the fully nonced digest for removing a watchtower
     function getRemoveWatchtowerDigestNonced(bytes32 watchtower, uint256 nonce) public view returns (bytes32) {
         bytes32 msgHash = _getRemoveWatchtowerDigest(watchtower);
+        return getNoncedDigest(msgHash, nonce);
+    }
+
+    // ========== Digest Helpers (Verifier) ==========
+    /// @dev Returns the domain-bound message hash for adding a verifier peerId (without nonce)
+    function _getAddVerifierDigest(bytes calldata peerId) internal view returns (bytes32) {
+        bytes32 typeHash = keccak256("ADD_VERIFIER(bytes peerId)");
+        return keccak256(abi.encode(typeHash, address(this), keccak256(peerId)));
+    }
+
+    /// @notice Returns the fully nonced digest for adding a verifier peerId
+    function getAddVerifierDigestNonced(bytes calldata peerId, uint256 nonce) public view returns (bytes32) {
+        bytes32 msgHash = _getAddVerifierDigest(peerId);
+        return getNoncedDigest(msgHash, nonce);
+    }
+
+    /// @dev Returns the domain-bound message hash for removing a verifier peerId (without nonce)
+    function _getRemoveVerifierDigest(bytes calldata peerId) internal view returns (bytes32) {
+        bytes32 typeHash = keccak256("REMOVE_VERIFIER(bytes peerId)");
+        return keccak256(abi.encode(typeHash, address(this), keccak256(peerId)));
+    }
+
+    /// @notice Returns the fully nonced digest for removing a verifier peerId
+    function getRemoveVerifierDigestNonced(bytes calldata peerId, uint256 nonce) public view returns (bytes32) {
+        bytes32 msgHash = _getRemoveVerifierDigest(peerId);
         return getNoncedDigest(msgHash, nonce);
     }
 
@@ -261,5 +332,5 @@ contract CommitteeManagement is MultiSigVerifier {
         return getNoncedDigest(msgHash, nonce);
     }
 
-    uint256[50] private __gap;
+    uint256[47] private __gap;
 }
