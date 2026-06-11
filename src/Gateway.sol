@@ -517,11 +517,11 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable, IGateway {
         _finalizeWithdraw(graphId, rawTake2Tx, take2Proof, graphData.take2Txid, false);
     }
 
-    // if no challengeStartTx happens (for QuickChallenge & ChallengeIncompleteKickoff), set rawChallengeStartTx.inputVector to empty
+    // if no challengeStartTx happens, set rawChallengeStartTx.inputVector to empty
     function finishWithdrawDisproved(
         bytes16 graphId,
         DisproveTxType disproveTxType,
-        uint256 txnIndex, // nack txns index or assert timeout txns index, ignored for other disprove types
+        uint256 txnIndex, // per-index disprove/timeout/nack tx index, ignored for pubin and operator commit timeout
         BitvmTxParser.BitcoinTx calldata rawChallengeStartTx,
         MerkleProof.BitcoinTxProof calldata challengeStartTxProof,
         BitvmTxParser.BitcoinTx calldata rawChallengeFinishTx,
@@ -544,6 +544,10 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable, IGateway {
             (
                 disproveTxType == DisproveTxType.QuickChallenge
                     || disproveTxType == DisproveTxType.ChallengeIncompleteKickoff
+                    || disproveTxType == DisproveTxType.PubinDisprove
+                    || disproveTxType == DisproveTxType.WatchtowerChallengeTimeout
+                    || disproveTxType == DisproveTxType.OperatorChallengeNack
+                    || disproveTxType == DisproveTxType.OperatorCommitTimeout
             ) && (rawChallengeStartTx.inputVector.length == 0)
         ) {
             // no challenge start tx
@@ -580,6 +584,39 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable, IGateway {
                 BitvmTxParser._parseChallengeIncompleteKickoffTx(rawChallengeFinishTx);
             if (kickoffTxid != graphData.kickoffTxid) revert TxidMismatch();
             if (kickoffVout != BitvmTxParser.GUARDIAN_CONNECTOR_VOUT) {
+                revert TxidMismatch();
+            }
+        } else if (disproveTxType == DisproveTxType.PubinDisprove) {
+            challengeFinishTxid = BitvmTxParser._computeTxid(rawChallengeFinishTx);
+            if (challengeFinishTxid == graphData.take2Txid) {
+                revert TxidMismatch();
+            }
+            if (
+                !BitvmTxParser._hasInputOutpoint(
+                    rawChallengeFinishTx, graphData.proverAssertTxid, uint32(graphData.disproveTxids.length)
+                )
+            ) {
+                revert TxidMismatch();
+            }
+        } else if (disproveTxType == DisproveTxType.WatchtowerChallengeTimeout) {
+            challengeFinishTxid = BitvmTxParser._computeTxid(rawChallengeFinishTx);
+            if (graphData.watchtowerChallengeTimeoutTxids.length <= txnIndex) {
+                revert IndexOutOfRange();
+            }
+            if (challengeFinishTxid != graphData.watchtowerChallengeTimeoutTxids[txnIndex]) {
+                revert TxidMismatch();
+            }
+        } else if (disproveTxType == DisproveTxType.OperatorChallengeNack) {
+            challengeFinishTxid = BitvmTxParser._computeTxid(rawChallengeFinishTx);
+            if (graphData.operatorChallengeNackTxids.length <= txnIndex) {
+                revert IndexOutOfRange();
+            }
+            if (challengeFinishTxid != graphData.operatorChallengeNackTxids[txnIndex]) {
+                revert TxidMismatch();
+            }
+        } else if (disproveTxType == DisproveTxType.OperatorCommitTimeout) {
+            challengeFinishTxid = BitvmTxParser._computeTxid(rawChallengeFinishTx);
+            if (challengeFinishTxid != graphData.operatorCommitTimeoutTxid) {
                 revert TxidMismatch();
             }
         } else {

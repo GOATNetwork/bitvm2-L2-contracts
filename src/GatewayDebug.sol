@@ -79,7 +79,7 @@ contract GatewayDebug is GatewayUpgradeable {
         require(withdrawData.status == WithdrawStatus.Initialized, "x");
         withdrawData.status = WithdrawStatus.Canceled;
         pegBTC.transfer(msg.sender, withdrawData.lockAmount);
-        peginData.status = PeginStatus.Withdrawbale;
+        peginData.status = PeginStatus.Withdrawable;
 
         emit CancelWithdraw(withdrawData.instanceId, graphId, msg.sender);
     }
