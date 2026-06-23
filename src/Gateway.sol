@@ -545,7 +545,6 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable, IGateway {
                 disproveTxType == DisproveTxType.QuickChallenge
                     || disproveTxType == DisproveTxType.ChallengeIncompleteKickoff
                     || disproveTxType == DisproveTxType.PubinDisprove
-                    || disproveTxType == DisproveTxType.WatchtowerChallengeTimeout
                     || disproveTxType == DisproveTxType.OperatorChallengeNack
                     || disproveTxType == DisproveTxType.OperatorCommitTimeout
             ) && (rawChallengeStartTx.inputVector.length == 0)
@@ -596,14 +595,6 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable, IGateway {
                     rawChallengeFinishTx, graphData.proverAssertTxid, uint32(graphData.disproveTxids.length)
                 )
             ) {
-                revert TxidMismatch();
-            }
-        } else if (disproveTxType == DisproveTxType.WatchtowerChallengeTimeout) {
-            challengeFinishTxid = BitvmTxParser._computeTxid(rawChallengeFinishTx);
-            if (graphData.watchtowerChallengeTimeoutTxids.length <= txnIndex) {
-                revert IndexOutOfRange();
-            }
-            if (challengeFinishTxid != graphData.watchtowerChallengeTimeoutTxids[txnIndex]) {
                 revert TxidMismatch();
             }
         } else if (disproveTxType == DisproveTxType.OperatorChallengeNack) {

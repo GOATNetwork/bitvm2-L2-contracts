@@ -40,7 +40,6 @@ interface IGateway {
         QuickChallenge,
         ChallengeIncompleteKickoff,
         PubinDisprove,
-        WatchtowerChallengeTimeout,
         OperatorChallengeNack,
         OperatorCommitTimeout
     }
