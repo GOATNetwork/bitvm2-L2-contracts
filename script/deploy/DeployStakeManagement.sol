@@ -11,7 +11,7 @@ contract DeployStakeManagement is Script {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         address deployer = vm.createWallet(deployerPrivateKey).addr;
         address gatewayProxy = vm.envAddress("GATEWAY_PROXY_ADDR");
-        address pegBTC = vm.envAddress("PEGBTC_ADDR");
+        address stakeToken = vm.envAddress("STAKE_TOKEN_ADDR");
 
         vm.startBroadcast(deployerPrivateKey);
 
@@ -19,7 +19,7 @@ contract DeployStakeManagement is Script {
         console.log("StakeManagement implementation contract address: ", address(stakeImpl));
 
         bytes memory stakeInitData =
-            abi.encodeWithSelector(StakeManagement.initialize.selector, IERC20(pegBTC), gatewayProxy);
+            abi.encodeWithSelector(StakeManagement.initialize.selector, IERC20(stakeToken), gatewayProxy);
         UpgradeableProxy stakeProxy = new UpgradeableProxy(address(stakeImpl), deployer, stakeInitData);
         console.log("StakeManagement proxy contract address: ", address(stakeProxy));
 

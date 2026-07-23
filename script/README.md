@@ -37,5 +37,6 @@ Repeat the command with the appropriate script name (and `goatMainnet` when depl
 - `PRIVATE_KEY`: broadcaster key (hex string, no quotes).
 - `BITCOINSPV_ADDR`: previously deployed Bitcoin SPV contract.
 - `GATEWAY_PROXY_ADDR`: emitted when deploying the gateway proxy (needed by PegBTC + Committee scripts).
+- `STAKE_TOKEN_ADDR`: token used by the StakeManagement deployment.
 - `PEGBTC_ADDR`, `COMMITTEE_PROXY_ADDR`, `STAKE_PROXY_ADDR`: used by the Gateway deploy script when encoding initializer calldata.
 - `COMMITTEE_<i>` / `WATCHTOWER_<i>`: sequential committee + watchtower definitions for the committee deploy script.

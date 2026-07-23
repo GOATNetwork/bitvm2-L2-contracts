@@ -19,6 +19,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
     Required env vars:
     - PRIVATE_KEY:      uint256 private key to broadcast from (deployer)
     - BITCOINSPV_ADDR:  address of the BitcoinSPV contract
+    - STAKE_TOKEN_ADDR: address of the token used by StakeManagement
 */
 contract DeployGateway is Script {
     address public deployer;
@@ -75,8 +76,10 @@ contract DeployGateway is Script {
         // Deploy StakeManagement implementation + proxy
         StakeManagement stakeImpl = new StakeManagement();
         console.log("StakeManagement implementation contract address: ", address(stakeImpl));
+        address stakeToken = vm.envAddress("STAKE_TOKEN_ADDR");
+        console.log("Stake token address: ", stakeToken);
         bytes memory stakeInitData =
-            abi.encodeWithSelector(StakeManagement.initialize.selector, IERC20(address(pegBTC)), address(gateway));
+            abi.encodeWithSelector(StakeManagement.initialize.selector, IERC20(stakeToken), address(gateway));
         UpgradeableProxy stakeProxy = new UpgradeableProxy(address(stakeImpl), deployer, stakeInitData);
         console.log("StakeManagement proxy contract address: ", address(stakeProxy));
         IStakeManagement stakeManagement = IStakeManagement(address(stakeProxy));
