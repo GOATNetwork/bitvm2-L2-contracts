@@ -36,18 +36,18 @@ interface IGateway {
 
     // ===== Enums =====
     enum DisproveTxType {
-        AssertTimeout,
-        OperatorCommitTimeout,
-        OperatorNack,
         Disprove,
         QuickChallenge,
-        ChallengeIncompeleteKickoff
+        ChallengeIncompleteKickoff,
+        PubinDisprove,
+        OperatorChallengeNack,
+        OperatorCommitTimeout
     }
 
     enum PeginStatus {
         None,
         Pending,
-        Withdrawbale,
+        Withdrawable,
         Processing,
         Locked,
         Claimed,
@@ -120,9 +120,12 @@ interface IGateway {
         bytes32 kickoffTxid;
         bytes32 take1Txid;
         bytes32 take2Txid;
-        bytes32 commitTimoutTxid;
-        bytes32[] assertTimoutTxids;
-        bytes32[] NackTxids;
+        bytes32 watchtowerChallengeInitTxid;
+        bytes32 proverAssertTxid;
+        bytes32[] disproveTxids;
+        bytes32[] watchtowerChallengeTimeoutTxids;
+        bytes32[] operatorChallengeNackTxids;
+        bytes32 operatorCommitTimeoutTxid;
     }
 
     // ===== Events =====

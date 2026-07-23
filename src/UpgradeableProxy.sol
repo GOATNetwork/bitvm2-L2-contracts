@@ -11,4 +11,9 @@ contract UpgradeableProxy is TransparentUpgradeableProxy {
     function proxyAdmin() external view returns (address) {
         return _proxyAdmin();
     }
+
+    /// @dev Delegates plain ETH transfers using the same path as regular calls.
+    receive() external payable {
+        _fallback();
+    }
 }
