@@ -51,23 +51,23 @@ contract GatewayDebug is GatewayUpgradeable {
     //     minSlashAmount = _minSlashAmount;
     // }
 
-    function debugClearData() external onlyCommittee {
-        for (uint256 i = 0; i < instanceIds.length; i++) {
-            bytes16 instanceId = instanceIds[i];
+    // function debugClearData() external onlyCommittee {
+    //     for (uint256 i = 0; i < instanceIds.length; i++) {
+    //         bytes16 instanceId = instanceIds[i];
 
-            bytes16[] storage graphIds = instanceIdToGraphIds[instanceId];
-            for (uint256 j = 0; j < graphIds.length; j++) {
-                bytes16 graphId = graphIds[j];
-                delete graphDataMap[graphId];
-                delete withdrawDataMap[graphId];
-            }
+    //         bytes16[] storage graphIds = instanceIdToGraphIds[instanceId];
+    //         for (uint256 j = 0; j < graphIds.length; j++) {
+    //             bytes16 graphId = graphIds[j];
+    //             delete graphDataMap[graphId];
+    //             delete withdrawDataMap[graphId];
+    //         }
 
-            delete instanceIdToGraphIds[instanceId];
-            delete peginDataMap[instanceId];
-        }
+    //         delete instanceIdToGraphIds[instanceId];
+    //         delete peginDataMap[instanceId];
+    //     }
 
-        delete instanceIds;
-    }
+    //     delete instanceIds;
+    // }
 
     function debugUpdateSpvContract(IBitcoinSPV _bitcoinSPV) external onlyCommittee {
         bitcoinSPV = _bitcoinSPV;
@@ -78,7 +78,7 @@ contract GatewayDebug is GatewayUpgradeable {
         PeginDataInner storage peginData = peginDataMap[withdrawData.instanceId];
         require(withdrawData.status == WithdrawStatus.Initialized, "x");
         withdrawData.status = WithdrawStatus.Canceled;
-        pegBTC.transfer(msg.sender, withdrawData.lockAmount);
+        _safeTransfer(pegBTC, msg.sender, withdrawData.lockAmount);
         peginData.status = PeginStatus.Withdrawable;
 
         emit CancelWithdraw(withdrawData.instanceId, graphId, msg.sender);

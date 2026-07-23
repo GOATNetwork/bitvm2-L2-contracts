@@ -118,7 +118,7 @@ contract SequencerSetPublisherTest is Test {
     ) public {
         // Generate a valid signature from ANY key (e.g. the first publisher key)
         // Since we don't check WHO signed it, just that it IS a signature.
-        (uint8 _v, bytes32 r, bytes32 s) = vm.sign(publisherKeys[0], p2wshSigHash.toEthSignedMessageHash());
+        (, bytes32 r, bytes32 s) = vm.sign(publisherKeys[0], p2wshSigHash.toEthSignedMessageHash());
         bytes memory sig = abi.encodePacked(r, s);
 
         // Generate valid compressed BTC pubkey from private key

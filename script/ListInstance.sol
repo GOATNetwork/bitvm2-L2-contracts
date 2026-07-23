@@ -63,6 +63,13 @@ contract DebugListInstance is Script {
         return "Unknown";
     }
 
+    function matchesStatusFilter(uint256 status, int256 filter) internal pure returns (bool) {
+        if (filter < 0) return false;
+        // Casting to uint256 is safe because negative filters return above.
+        // forge-lint: disable-next-line(unsafe-typecast)
+        return status == uint256(filter);
+    }
+
     function listInstance(uint256 index, bytes16 instanceId) internal view {
         // Get Pegin Status
         (bool success, bytes memory data) =
@@ -76,7 +83,7 @@ contract DebugListInstance is Script {
         }
 
         if (filterPeginStatus != -1) {
-            if (!statusFetched || int256(statusVal) != filterPeginStatus) {
+            if (!statusFetched || !matchesStatusFilter(statusVal, filterPeginStatus)) {
                 return;
             }
         }
@@ -117,7 +124,7 @@ contract DebugListInstance is Script {
         }
 
         if (filterWithdrawStatus != -1) {
-            if (!statusFetched || int256(statusVal) != filterWithdrawStatus) {
+            if (!statusFetched || !matchesStatusFilter(statusVal, filterWithdrawStatus)) {
                 return;
             }
         }
