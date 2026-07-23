@@ -8,6 +8,7 @@ interface IStakeManagement {
     event StakeUnlocked(address indexed operator, uint256 amount);
     event StakeSlashed(address indexed operator, uint256 amount);
     event PubkeyRegistered(address indexed operator, bytes32 pubkey);
+    event PubkeyUnregistered(address indexed operator, bytes32 pubkey);
 
     function stakeTokenAddress() external view returns (address);
     function pubkeyToAddress(bytes32 pubkey) external view returns (address); // XOnlyPubkey
@@ -18,5 +19,7 @@ interface IStakeManagement {
     function unlockStake(address operator, uint256 amount) external;
     function stake(uint256 amount) external;
     function unstake(uint256 amount) external;
-    function registerPubkey(bytes32 pubkey) external;
+    function getRegisterPubkeyDigest(address operator) external view returns (bytes32);
+    function registerPubkey(bytes32 pubkey, bytes1 pubkeyPrefix, bytes calldata signature) external;
+    function unregisterPubkey() external;
 }

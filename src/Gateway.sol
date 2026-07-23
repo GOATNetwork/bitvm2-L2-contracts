@@ -220,8 +220,12 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable, IGateway {
         WithdrawData storage withdrawData = withdrawDataMap[graphId];
         bytes16 instanceId = withdrawData.instanceId;
         PeginDataInner storage peginData = peginDataMap[instanceId];
+        GraphData storage graphData = graphDataMap[graphId];
         if (withdrawData.status != WithdrawStatus.Processing) {
             revert WithdrawStatusInvalid();
+        }
+        if (graphData.peginTxid == bytes32(0) || graphData.peginTxid != withdrawData.peginTxid) {
+            revert GraphPeginTxidMismatch();
         }
 
         bytes32 takeTxid = BitvmTxParser._computeTxid(rawTakeTx);
@@ -430,6 +434,10 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable, IGateway {
         if (peginData.status != PeginStatus.Withdrawable) {
             revert NotWithdrawable();
         }
+        GraphData storage graphData = graphDataMap[graphId];
+        if (graphData.peginTxid == bytes32(0) || graphData.peginTxid != peginData.peginTxid) {
+            revert GraphPeginTxidMismatch();
+        }
 
         // lock the pegin utxo so others can not withdraw it
         peginData.status = PeginStatus.Locked;
@@ -496,6 +504,9 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable, IGateway {
         }
 
         GraphData storage graphData = graphDataMap[graphId];
+        if (graphData.peginTxid == bytes32(0) || graphData.peginTxid != withdrawData.peginTxid) {
+            revert GraphPeginTxidMismatch();
+        }
         bytes32 kickoffTxid = BitvmTxParser._computeTxid(rawKickoffTx);
         if (kickoffTxid != graphData.kickoffTxid) revert TxidMismatch();
         _verifyMerkleInclusion(kickoffProof, kickoffTxid, false);

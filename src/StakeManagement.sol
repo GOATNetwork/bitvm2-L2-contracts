@@ -4,8 +4,12 @@ pragma solidity ^0.8.28;
 import {IStakeManagement} from "./interfaces/IStakeManagement.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {BtcUtils} from "./libraries/BtcUtils.sol";
 
 contract StakeManagement is IStakeManagement, Initializable {
+    bytes32 private constant REGISTER_PUBKEY_TYPEHASH =
+        keccak256("REGISTER_PUBKEY(address contract,uint256 chainId,address operator)");
+
     IERC20 public stakeToken;
     address public gatewayAddress;
 
@@ -82,12 +86,35 @@ contract StakeManagement is IStakeManagement, Initializable {
         emit StakeWithdrawn(msg.sender, amount);
     }
 
-    function registerPubkey(bytes32 pubkey) external {
+    /// @notice Returns the digest an operator's Bitcoin key must sign before it can be registered.
+    function getRegisterPubkeyDigest(address operator) public view override returns (bytes32) {
+        return keccak256(abi.encode(REGISTER_PUBKEY_TYPEHASH, address(this), block.chainid, operator));
+    }
+
+    /// @notice Registers an x-only Bitcoin public key after proving possession of its private key.
+    function registerPubkey(bytes32 pubkey, bytes1 pubkeyPrefix, bytes calldata signature) external override {
         require(addressToPubkey[msg.sender] == bytes32(0), "already registered a pubkey");
         require(pubkeyToAddress[pubkey] == address(0), "pubkey already registered by another address");
+
+        if (pubkeyPrefix != 0x02 && pubkeyPrefix != 0x03) revert BtcUtils.InvalidBtcPubkey();
+        BtcUtils.verifyBtcSignature(
+            getRegisterPubkeyDigest(msg.sender), abi.encodePacked(pubkeyPrefix, pubkey), signature
+        );
+
         addressToPubkey[msg.sender] = pubkey;
         pubkeyToAddress[pubkey] = msg.sender;
         emit PubkeyRegistered(msg.sender, pubkey);
+    }
+
+    /// @notice Releases the caller's key once it cannot secure an active graph anymore.
+    function unregisterPubkey() external override {
+        bytes32 pubkey = addressToPubkey[msg.sender];
+        require(pubkey != bytes32(0), "no registered pubkey");
+        require(lockedStakes[msg.sender] == 0, "cannot unregister with locked stake");
+
+        delete addressToPubkey[msg.sender];
+        delete pubkeyToAddress[pubkey];
+        emit PubkeyUnregistered(msg.sender, pubkey);
     }
 
     uint256[50] private __gap;
