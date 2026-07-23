@@ -80,10 +80,10 @@ contract GatewayUpgradeable is BitvmPolicy, Initializable, IGateway {
         minOperatorRewardSats = 3000; // 0.00003 BTC
         operatorRewardRate = 30; // 0.3%
 
-        minStakeAmount = 60000000000000000; // 0.06 stakeToken(pegBTC)
-        minChallengerReward = 12500000000000000; // 0.0125 stakeToken(pegBTC)
-        minDisproverReward = 2500000000000000; // 0.0025 stakeToken(pegBTC)
-        minSlashAmount = 30000000000000000; // 0.03 stakeToken(pegBTC)
+        minStakeAmount = 60000000000000000; // 0.06 stakeToken(WGBTC)
+        minChallengerReward = 12500000000000000; // 0.0125 stakeToken(WGBTC)
+        minDisproverReward = 2500000000000000; // 0.0025 stakeToken(WGBTC)
+        minSlashAmount = 30000000000000000; // 0.03 stakeToken(WGBTC)
 
         responseWindowBlocks = 200; // 200 goat blocks ~ 10 minutes
         cancelWithdrawTimelock = 144; // 144 btc blocks ~ 24 hours

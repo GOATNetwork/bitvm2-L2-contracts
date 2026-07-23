@@ -10,13 +10,13 @@ import {GatewayUpgradeable} from "../src/Gateway.sol";
 /*
 # Operator stake and lock
 
-Stake PBTC as an operator and lock it via StakeManagement fetched from the Gateway.
+Stake the configured stake token as an operator and lock it via StakeManagement fetched from the Gateway.
 
 Env vars:
 - GATEWAY_ADDR: address of the Gateway proxy
 - PRIVATE_KEY: operator's private key
-- STAKE_AMOUNT: amount of PBTC to stake (wei)
-- LOCK_AMOUNT: amount to lock (wei), optional; defaults to STAKE_AMOUNT when omitted or 0
+- STAKE_AMOUNT: amount of the configured stake token to stake (base units)
+- LOCK_AMOUNT: amount to lock (base units), optional; defaults to STAKE_AMOUNT when omitted or 0
 
 Example:
 
@@ -74,8 +74,8 @@ contract OperatorStake is Script {
         // Approve if needed
         uint256 allowance = token.allowance(operator, stakeManagementAddr);
         if (allowance < stakeAmount) {
-            // Approve exactly the shortfall to minimize allowance; simple path: set to stakeAmount
-            // If an allowance already exists, some ERC20s require resetting to 0 first; PegBTC is standard OpenZeppelin ERC20, so direct set is fine.
+            // WGBTC uses OpenZeppelin ERC20, so an existing non-zero allowance can be updated directly.
+            // Set allowance to stakeAmount because StakeManagement pulls the full amount in stake().
             bool ok = token.approve(stakeManagementAddr, stakeAmount);
             require(ok, "approve failed");
             console.log("approved:", stakeAmount);
